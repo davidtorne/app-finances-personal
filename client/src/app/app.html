@@ -1,0 +1,653 @@
+<main class="app-shell">
+  <header class="topbar">
+    <div>
+      <p class="eyebrow">Control personal</p>
+      <h1>Les meves finances</h1>
+    </div>
+    <button
+      type="button"
+      class="backup-button"
+      (click)="backupDatabase()"
+      [disabled]="backingUp"
+    >
+      {{ backingUp ? 'Creant copia...' : 'Copia BBDD' }}
+    </button>
+  </header>
+
+  @if (error) {
+    <div class="alert">{{ error }}</div>
+  }
+  @if (notice) {
+    <div class="notice">{{ notice }}</div>
+  }
+
+  <section class="summary-grid" aria-label="Resum financer">
+    <article class="summary-card balance">
+      <span>Saldo del període</span>
+      <strong>{{ formatCurrency(summary?.balance ?? 0) }}</strong>
+      <small>{{ periodLabel() }}</small>
+    </article>
+    <article class="summary-card">
+      <span>Ingressos</span>
+      <strong class="positive">{{ formatCurrency(summary?.income ?? 0) }}</strong>
+      <small>Total del període seleccionat</small>
+    </article>
+    <article class="summary-card">
+      <span>Despeses</span>
+      <strong class="negative">{{ formatCurrency(summary?.expense ?? 0) }}</strong>
+      <small>Total del període seleccionat</small>
+    </article>
+  </section>
+
+  <nav class="section-tabs" aria-label="Apartats de l'aplicació">
+    <button
+      type="button"
+      [class.active]="activeSection === 'consultation'"
+      (click)="showSection('consultation')"
+    >
+      Consulta i totalització
+    </button>
+    <button
+      type="button"
+      [class.active]="activeSection === 'entry'"
+      (click)="showSection('entry')"
+    >
+      Entrada de dades
+    </button>
+    <button
+      type="button"
+      [class.active]="activeSection === 'budgets'"
+      (click)="showSection('budgets')"
+    >
+      Pressupostos
+    </button>
+  </nav>
+
+  @if (activeSection === 'consultation') {
+    <section class="query-toolbar panel">
+      <div>
+        <p class="eyebrow">Període de consulta</p>
+        <h2>Selecciona les dates</h2>
+      </div>
+
+      <div class="period-controls" aria-label="Període del resum">
+        <div class="period-selector">
+          <div class="segmented">
+            <button
+              type="button"
+              [class.active]="period === 'week'"
+              (pointerdown)="changePeriod('week'); $event.preventDefault()"
+              (keydown.enter)="changePeriod('week')"
+              (keydown.space)="changePeriod('week'); $event.preventDefault()"
+            >
+              Setmana
+            </button>
+            <button
+              type="button"
+              [class.active]="period === 'month'"
+              (pointerdown)="changePeriod('month'); $event.preventDefault()"
+              (keydown.enter)="changePeriod('month')"
+              (keydown.space)="changePeriod('month'); $event.preventDefault()"
+            >
+              Mes
+            </button>
+            <button
+              type="button"
+              [class.active]="period === 'year'"
+              (pointerdown)="changePeriod('year'); $event.preventDefault()"
+              (keydown.enter)="changePeriod('year')"
+              (keydown.space)="changePeriod('year'); $event.preventDefault()"
+            >
+              Any
+            </button>
+          </div>
+          <div class="period-navigation" aria-label="Navegació temporal">
+            <button
+              type="button"
+              (pointerdown)="navigatePeriod(-1); $event.preventDefault()"
+              (keydown.enter)="navigatePeriod(-1)"
+              (keydown.space)="navigatePeriod(-1); $event.preventDefault()"
+            >
+              &lt; Anterior
+            </button>
+            <button
+              type="button"
+              (pointerdown)="goToCurrentPeriod(); $event.preventDefault()"
+              (keydown.enter)="goToCurrentPeriod()"
+              (keydown.space)="goToCurrentPeriod(); $event.preventDefault()"
+              [disabled]="isCurrentPeriod()"
+            >
+              Actual
+            </button>
+            <button
+              type="button"
+              (pointerdown)="navigatePeriod(1); $event.preventDefault()"
+              (keydown.enter)="navigatePeriod(1)"
+              (keydown.space)="navigatePeriod(1); $event.preventDefault()"
+              [disabled]="isCurrentPeriod()"
+            >
+              Següent &gt;
+            </button>
+          </div>
+        </div>
+
+        <div class="date-range" aria-label="Dates del període">
+          <label>
+            <span>Inici</span>
+            <input
+              type="date"
+              [value]="periodFrom"
+              readonly
+              aria-label="Data d'inici"
+            />
+          </label>
+          <label>
+            <span>Final</span>
+            <input
+              type="date"
+              [value]="periodTo"
+              readonly
+              aria-label="Data final"
+            />
+          </label>
+        </div>
+      </div>
+    </section>
+
+    <section class="panel tag-summary">
+      <div class="panel-heading">
+        <div>
+          <p class="eyebrow">Anàlisi</p>
+          <h2>Totals per tag</h2>
+        </div>
+        <span class="count">{{ summary?.tagTotals?.length ?? 0 }} tags</span>
+      </div>
+
+      <div class="tag-summary-filters">
+        <label>
+          <span>Tipus</span>
+          <select
+            [(ngModel)]="typeFilterId"
+            (ngModelChange)="changeTagFilters()"
+          >
+            <option [ngValue]="0">Tots els tipus</option>
+            @for (tag of typeGroup?.tags ?? []; track tag.id) {
+              <option [ngValue]="tag.id">{{ tag.name }}</option>
+            }
+          </select>
+        </label>
+        <label>
+          <span>Subtipus</span>
+          <select
+            [(ngModel)]="subtypeFilterId"
+            (ngModelChange)="changeTagFilters()"
+          >
+            <option [ngValue]="0">Tots els subtipus</option>
+            @for (tag of subtypeGroup?.tags ?? []; track tag.id) {
+              <option [ngValue]="tag.id">{{ tag.name }}</option>
+            }
+          </select>
+        </label>
+        @if (typeFilterId || subtypeFilterId) {
+          <button type="button" (click)="clearTagFilters()">
+            Netejar filtres
+          </button>
+        }
+      </div>
+
+      @if (summary?.tagTotals?.length) {
+        <div class="tag-total-list">
+          @for (total of summary?.tagTotals; track total.tagId) {
+            <div class="tag-total-row">
+              <i [style.background]="total.color"></i>
+              <div>
+                <strong>{{ total.tagName }}</strong>
+                <span>{{ total.groupName }}</span>
+              </div>
+              <div class="tag-amounts">
+                @if (total.income) {
+                  <small class="positive">+{{ formatCurrency(total.income) }}</small>
+                }
+                @if (total.expense) {
+                  <b>{{ formatCurrency(total.expense) }}</b>
+                }
+              </div>
+            </div>
+          }
+        </div>
+      } @else {
+        <div class="empty-state">
+          <strong>Encara no hi ha totals</strong>
+          <span>No hi ha moviments per als filtres seleccionats.</span>
+        </div>
+      }
+    </section>
+
+    <section class="panel movements">
+      <div class="panel-heading">
+        <div>
+          <p class="eyebrow">Historial</p>
+          <h2>Moviments del període</h2>
+        </div>
+        <span class="count">{{ transactions.length }} registres</span>
+      </div>
+
+      @if (transactions.length) {
+        <div class="movement-list">
+          @for (transaction of transactions; track transaction.id) {
+            <article class="movement-row">
+              <div
+                class="movement-icon"
+                [class.income]="transaction.type === 'income'"
+              >
+                {{ transaction.type === 'income' ? '+' : '-' }}
+              </div>
+              <div class="movement-main">
+                <strong>{{ transaction.description }}</strong>
+                <span>{{ formatDate(transaction.date) }}</span>
+                <div class="tag-list">
+                  @for (tag of transaction.tags; track tag.id) {
+                    <span>
+                      <i [style.background]="tag.color"></i>
+                      {{ tag.name }}
+                    </span>
+                  }
+                </div>
+              </div>
+              <strong
+                class="movement-amount"
+                [class.positive]="transaction.type === 'income'"
+                [class.negative]="transaction.type === 'expense'"
+              >
+                {{ transaction.type === 'income' ? '+' : '-'
+                }}{{ formatCurrency(transaction.amount) }}
+              </strong>
+              <button
+                type="button"
+                class="delete-button"
+                (click)="deleteTransaction(transaction.id)"
+                aria-label="Eliminar moviment"
+              >
+                ×
+              </button>
+            </article>
+          }
+        </div>
+      } @else {
+        <div class="empty-state large">
+          <strong>Cap moviment registrat</strong>
+          <span>No hi ha moviments per al període seleccionat.</span>
+        </div>
+      }
+    </section>
+  } @else if (activeSection === 'entry') {
+    <section class="entry-grid">
+      <article class="panel transaction-form">
+        <div class="panel-heading">
+          <div>
+            <p class="eyebrow">Nou registre</p>
+            <h2>Afegir moviment</h2>
+          </div>
+        </div>
+
+        <form (ngSubmit)="saveTransaction()">
+          <div class="type-switch">
+            <label [class.selected]="transactionForm.type === 'expense'">
+              <input
+                type="radio"
+                name="type"
+                value="expense"
+                [(ngModel)]="transactionForm.type"
+              />
+              Despesa
+            </label>
+            <label [class.selected]="transactionForm.type === 'income'">
+              <input
+                type="radio"
+                name="type"
+                value="income"
+                [(ngModel)]="transactionForm.type"
+              />
+              Ingrés
+            </label>
+          </div>
+
+          <label class="field">
+            <span>Descripció</span>
+            <input
+              name="description"
+              [(ngModel)]="transactionForm.description"
+              placeholder="Ex. Compra setmanal"
+              maxlength="240"
+              required
+            />
+          </label>
+
+          <div class="field-row">
+            <label class="field">
+              <span>Import</span>
+              <div class="amount-input">
+                <input
+                  type="number"
+                  name="amount"
+                  [(ngModel)]="transactionForm.amount"
+                  min="0.01"
+                  step="0.01"
+                  placeholder="0,00"
+                  required
+                />
+                <b>€</b>
+              </div>
+            </label>
+            <label class="field">
+              <span>Data</span>
+              <input
+                type="date"
+                name="date"
+                [(ngModel)]="transactionForm.date"
+                required
+              />
+            </label>
+          </div>
+
+          <div class="tag-groups">
+            @for (group of tagGroups; track group.id) {
+              <fieldset>
+                <legend>
+                  {{ group.name }}
+                  @if (group.isRequired) {
+                    <span class="required">obligatori</span>
+                  }
+                </legend>
+
+                @if (group.selectionMode === 'single') {
+                  <select
+                    [ngModel]="selectedSingleTag(group)"
+                    (ngModelChange)="selectSingleTag(group, $event)"
+                    [name]="'tag-group-' + group.id"
+                  >
+                    <option value="">Sense seleccionar</option>
+                    @for (tag of group.tags; track tag.id) {
+                      <option [value]="tag.id">{{ tag.name }}</option>
+                    }
+                  </select>
+                } @else {
+                  <div class="tag-picker">
+                    @for (tag of group.tags; track tag.id) {
+                      <label
+                        class="tag-option"
+                        [class.selected]="selectedTagIds.has(tag.id)"
+                      >
+                        <input
+                          type="checkbox"
+                          [checked]="selectedTagIds.has(tag.id)"
+                          (change)="toggleTag(tag.id, $any($event.target).checked)"
+                        />
+                        <i [style.background]="tag.color"></i>
+                        {{ tag.name }}
+                      </label>
+                    }
+                  </div>
+                }
+              </fieldset>
+            }
+          </div>
+
+          <button class="primary-button" type="submit" [disabled]="saving">
+            {{ saving ? 'Guardant...' : 'Guardar moviment' }}
+          </button>
+        </form>
+      </article>
+
+      <article class="panel tag-manager">
+        <div class="panel-heading">
+          <div>
+            <p class="eyebrow">Configuració</p>
+            <h2>Crear un tag</h2>
+          </div>
+        </div>
+        <p class="panel-description">
+          Afegeix un tag al grup corresponent. Estarà disponible immediatament
+          al formulari de moviments.
+        </p>
+        <div class="tag-manager-fields">
+          <label class="field">
+            <span>Grup</span>
+            <select [(ngModel)]="newTag.tagGroupId">
+              @for (group of tagGroups; track group.id) {
+                <option [ngValue]="group.id">{{ group.name }}</option>
+              }
+            </select>
+          </label>
+          <label class="field">
+            <span>Nom del tag</span>
+            <input [(ngModel)]="newTag.name" placeholder="Ex. Supermercat" />
+          </label>
+          <label class="field">
+            <span>Color</span>
+            <input
+              class="color-input"
+              type="color"
+              [(ngModel)]="newTag.color"
+              aria-label="Color del tag"
+            />
+          </label>
+          <button
+            class="secondary-button"
+            type="button"
+            (click)="createTag()"
+            [disabled]="savingTag"
+          >
+            {{ savingTag ? 'Afegint...' : 'Afegir tag' }}
+          </button>
+        </div>
+      </article>
+    </section>
+  } @else {
+    <section class="budget-layout">
+      <article class="panel budget-create">
+        <div class="panel-heading">
+          <div><p class="eyebrow">Planificació</p><h2>Crear un pressupost</h2></div>
+        </div>
+        <form (ngSubmit)="createBudget()">
+          <label class="field">
+            <span>Nom</span>
+            <input name="budget-name" [(ngModel)]="budgetForm.name" placeholder="Ex. Pressupost juliol" maxlength="120" required />
+          </label>
+          <div class="field-row">
+            <label class="field"><span>Data d'inici</span><input name="budget-from" type="date" [(ngModel)]="budgetForm.from" required /></label>
+            <label class="field"><span>Data final</span><input name="budget-to" type="date" [(ngModel)]="budgetForm.to" required /></label>
+          </div>
+          <button class="secondary-button full-width" type="submit" [disabled]="savingBudget">
+            {{ savingBudget ? 'Creant...' : 'Crear pressupost' }}
+          </button>
+        </form>
+      </article>
+
+      <article class="panel budget-workspace">
+        <div class="panel-heading budget-heading">
+          <div><p class="eyebrow">Conceptes previstos</p><h2>{{ selectedBudget?.name ?? 'Selecciona un pressupost' }}</h2></div>
+          @if (selectedBudget) {
+            <div class="budget-actions">
+              <span>Saldo previst</span>
+              <strong class="budget-total" [class.negative]="selectedBudget!.expectedBalance < 0">
+                {{ formatCurrency(selectedBudget!.expectedBalance) }}
+              </strong>
+              <div class="budget-action-buttons">
+                <button type="button" class="text-action" (click)="openBudgetCopy()">Copiar</button>
+                <button type="button" class="text-danger" (click)="deleteBudget()">Eliminar</button>
+              </div>
+            </div>
+          }
+        </div>
+        <label class="field budget-selector">
+          <span>Pressupost</span>
+          <select [(ngModel)]="selectedBudgetId" (ngModelChange)="changeSelectedBudget()">
+            @if (!budgets.length) { <option [ngValue]="0">Encara no n'hi ha cap</option> }
+            @for (budget of budgets; track budget.id) {
+              <option [ngValue]="budget.id">{{ budget.name }} · {{ formatDate(budget.from) }} - {{ formatDate(budget.to) }}</option>
+            }
+          </select>
+        </label>
+
+        @if (showBudgetCopyForm && selectedBudget) {
+          <form class="budget-copy-form" (ngSubmit)="copyBudget()">
+            <div class="copy-form-heading">
+              <div>
+                <p class="eyebrow">Nova còpia</p>
+                <h3>Copiar {{ selectedBudget!.name }}</h3>
+              </div>
+              <button type="button" class="text-action" (click)="cancelBudgetCopy()">Cancel·lar</button>
+            </div>
+            <label class="field">
+              <span>Nom del nou pressupost</span>
+              <input name="copy-budget-name" [(ngModel)]="budgetCopyForm.name" maxlength="120" required />
+            </label>
+            <div class="field-row">
+              <label class="field"><span>Data d'inici</span><input name="copy-budget-from" type="date" [(ngModel)]="budgetCopyForm.from" required /></label>
+              <label class="field"><span>Data final</span><input name="copy-budget-to" type="date" [(ngModel)]="budgetCopyForm.to" required /></label>
+            </div>
+            <button class="secondary-button full-width" type="submit" [disabled]="savingBudgetCopy">
+              {{ savingBudgetCopy ? 'Copiant...' : 'Crear la còpia' }}
+            </button>
+          </form>
+        }
+
+        @if (selectedBudget) {
+          <div class="budget-summary">
+            <div><span>Ingressos previstos</span><strong class="positive">{{ formatCurrency(selectedBudget!.expectedIncome) }}</strong></div>
+            <div><span>Despeses previstes</span><strong class="negative">{{ formatCurrency(selectedBudget!.expectedExpense) }}</strong></div>
+          </div>
+
+          <section class="budget-comparison">
+            <div class="comparison-heading">
+              <div>
+                <p class="eyebrow">Pressupost contra realitat</p>
+                <h3>Despesa per tipus i subtipus</h3>
+              </div>
+              <span class="count">{{ selectedBudget!.comparisons.length }} grups</span>
+            </div>
+
+            @if (selectedBudget!.comparisons.length) {
+              <div class="comparison-list">
+                @for (comparison of selectedBudget!.comparisons; track comparison.key) {
+                  <article class="comparison-row" [class.exceeded]="comparison.isExceeded">
+                    <div class="comparison-title">
+                      <strong>{{ comparison.typeName }}</strong>
+                      <span>{{ comparison.subtypeName }}</span>
+                    </div>
+                    <div class="comparison-values">
+                      <span>Pressupostat <b>{{ formatCurrency(comparison.expectedExpense) }}</b></span>
+                      <span>Gastat <b>{{ formatCurrency(comparison.actualExpense) }}</b></span>
+                      <strong [class.negative]="comparison.isExceeded">
+                        {{ comparison.usagePercentage }}%
+                      </strong>
+                    </div>
+                    <div class="comparison-track">
+                      <i
+                        [class.exceeded]="comparison.isExceeded"
+                        [style.width.%]="comparison.usagePercentage > 100 ? 100 : comparison.usagePercentage"
+                      ></i>
+                    </div>
+                    @if (comparison.isExceeded) {
+                      <p class="comparison-warning">
+                        Superat en {{ formatCurrency(comparison.difference) }}
+                      </p>
+                    }
+                  </article>
+                }
+              </div>
+            } @else {
+              <div class="comparison-empty">
+                Assigna tags de Tipus o Subtipus als conceptes de despesa per poder-los comparar.
+              </div>
+            }
+          </section>
+          <form class="budget-item-form" (ngSubmit)="saveBudgetItem()">
+            <div class="item-form-heading">
+              <h3>{{ editingBudgetItemId ? 'Editar concepte' : 'Afegir concepte' }}</h3>
+              @if (editingBudgetItemId) {
+                <button type="button" class="text-action" (click)="cancelBudgetItemEdit()">Cancel·lar edició</button>
+              }
+            </div>
+            <div class="type-switch budget-type-switch">
+              <label [class.selected]="budgetItemForm.type === 'expense'">
+                <input type="radio" name="budget-item-type" value="expense" [(ngModel)]="budgetItemForm.type" />
+                Despesa
+              </label>
+              <label [class.selected]="budgetItemForm.type === 'income'">
+                <input type="radio" name="budget-item-type" value="income" [(ngModel)]="budgetItemForm.type" />
+                Ingrés
+              </label>
+            </div>
+            <div class="field-row">
+              <label class="field concept-field">
+                <span>Concepte</span>
+                <input name="budget-item-description" [(ngModel)]="budgetItemForm.description" placeholder="Ex. Lloguer" maxlength="240" required />
+              </label>
+              <label class="field amount-field">
+                <span>Import esperat</span>
+                <div class="amount-input">
+                  <input type="number" name="budget-item-amount" [(ngModel)]="budgetItemForm.expectedAmount" min="0.01" step="0.01" required />
+                  <b>€</b>
+                </div>
+              </label>
+            </div>
+            <div class="tag-groups budget-tags">
+              @for (group of tagGroups; track group.id) {
+                <fieldset>
+                  <legend>{{ group.name }}</legend>
+                  @if (group.selectionMode === 'single') {
+                    <select [ngModel]="selectedSingleBudgetTag(group)" (ngModelChange)="selectSingleBudgetTag(group, $event)" [name]="'budget-tag-group-' + group.id">
+                      <option value="">Sense seleccionar</option>
+                      @for (tag of group.tags; track tag.id) { <option [value]="tag.id">{{ tag.name }}</option> }
+                    </select>
+                  } @else {
+                    <div class="tag-picker">
+                      @for (tag of group.tags; track tag.id) {
+                        <label class="tag-option" [class.selected]="selectedBudgetTagIds.has(tag.id)">
+                          <input type="checkbox" [checked]="selectedBudgetTagIds.has(tag.id)" (change)="toggleBudgetTag(tag.id, $any($event.target).checked)" />
+                          <i [style.background]="tag.color"></i>{{ tag.name }}
+                        </label>
+                      }
+                    </div>
+                  }
+                </fieldset>
+              }
+            </div>
+            <button class="primary-button" type="submit" [disabled]="savingBudgetItem">
+              {{ savingBudgetItem ? 'Guardant...' : (editingBudgetItemId ? 'Guardar canvis' : 'Afegir concepte') }}
+            </button>
+          </form>
+
+          @if (selectedBudget!.items.length) {
+            <div class="budget-item-list">
+              @for (item of selectedBudget!.items; track item.id) {
+                <article class="movement-row">
+                  <div class="movement-icon" [class.income]="item.type === 'income'">
+                    {{ item.type === 'income' ? '+' : '-' }}
+                  </div>
+                  <div class="movement-main">
+                    <strong>{{ item.description }}</strong>
+                    <div class="tag-list">
+                      @for (tag of item.tags; track tag.id) { <span><i [style.background]="tag.color"></i>{{ tag.name }}</span> }
+                    </div>
+                  </div>
+                  <strong class="movement-amount" [class.positive]="item.type === 'income'" [class.negative]="item.type === 'expense'">
+                    {{ item.type === 'income' ? '+' : '-' }}{{ formatCurrency(item.expectedAmount) }}
+                  </strong>
+                  <button type="button" class="edit-button" (click)="editBudgetItem(item)">Editar</button>
+                  <button type="button" class="delete-button" (click)="deleteBudgetItem(item.id)" aria-label="Eliminar concepte">×</button>
+                </article>
+              }
+            </div>
+          } @else {
+            <div class="empty-state"><strong>Pressupost buit</strong><span>Afegeix el primer concepte previst.</span></div>
+          }
+        } @else {
+          <div class="empty-state large"><strong>Comença creant un pressupost</strong><span>Després hi podràs afegir conceptes, imports i tags.</span></div>
+        }
+      </article>
+    </section>
+  }
+</main>
