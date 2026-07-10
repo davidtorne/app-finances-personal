@@ -1,5 +1,5 @@
 import { CommonModule } from '@angular/common';
-import { Component, OnDestroy, OnInit } from '@angular/core';
+import { Component, OnDestroy, OnInit, signal } from '@angular/core';
 import { FormsModule } from '@angular/forms';
 import { finalize, forkJoin, Observable, of, Subscription, switchMap } from 'rxjs';
 import { FinanceApiService } from './finance-api.service';
@@ -20,24 +20,24 @@ import {
 })
 export class App implements OnInit, OnDestroy {
   protected activeSection: 'consultation' | 'entry' | 'budgets' = 'consultation';
-  protected summary: FinanceSummary | null = null;
-  protected transactions: FinanceTransaction[] = [];
-  protected tagGroups: TagGroup[] = [];
+  protected readonly summary = signal<FinanceSummary | null>(null);
+  protected readonly transactions = signal<FinanceTransaction[]>([]);
+  protected readonly tagGroups = signal<TagGroup[]>([]);
   protected period: 'week' | 'month' | 'year' = 'month';
   protected anchor = this.today();
-  protected periodFrom = '';
-  protected periodTo = '';
+  protected readonly periodFrom = signal('');
+  protected readonly periodTo = signal('');
   protected typeFilterId = 0;
   protected subtypeFilterId = 0;
-  protected loading = true;
-  protected saving = false;
-  protected savingTag = false;
-  protected savingBudget = false;
-  protected savingBudgetCopy = false;
-  protected savingBudgetItem = false;
-  protected backingUp = false;
-  protected error = '';
-  protected notice = '';
+  protected readonly loading = signal(true);
+  protected readonly saving = signal(false);
+  protected readonly savingTag = signal(false);
+  protected readonly savingBudget = signal(false);
+  protected readonly savingBudgetCopy = signal(false);
+  protected readonly savingBudgetItem = signal(false);
+  protected readonly backingUp = signal(false);
+  protected readonly error = signal('');
+  protected readonly notice = signal('');
 
   protected transactionForm = {
     type: 'expense' as TransactionType,
@@ -52,7 +52,7 @@ export class App implements OnInit, OnDestroy {
     name: '',
     color: '#2563eb',
   };
-  protected budgets: Budget[] = [];
+  protected readonly budgets = signal<Budget[]>([]);
   protected selectedBudgetId = 0;
   protected budgetForm = {
     name: '',
@@ -87,12 +87,12 @@ export class App implements OnInit, OnDestroy {
   }
 
   protected loadAll(): void {
-    this.loading = true;
-    this.error = '';
+    this.loading.set(true);
+    this.error.set('');
 
     this.api.getTagGroups().subscribe({
       next: (groups) => {
-        this.tagGroups = groups;
+        this.tagGroups.set(groups);
         if (!this.newTag.tagGroupId && groups.length) {
           this.newTag.tagGroupId = groups[0].id;
         }
@@ -106,8 +106,8 @@ export class App implements OnInit, OnDestroy {
 
   protected refreshFinancialData(): void {
     this.financialDataSubscription?.unsubscribe();
-    this.loading = true;
-    this.error = '';
+    this.loading.set(true);
+    this.error.set('');
 
     const tagIds = this.activeFilterTagIds();
 
@@ -127,18 +127,18 @@ export class App implements OnInit, OnDestroy {
       )
       .subscribe({
         next: ({ summary, transactions }) => {
-          this.summary = summary;
-          this.periodFrom = summary.from;
-          this.periodTo = summary.to;
-          this.transactions = transactions;
-          this.loading = false;
+          this.summary.set(summary);
+          this.periodFrom.set(summary.from);
+          this.periodTo.set(summary.to);
+          this.transactions.set(transactions);
+          this.loading.set(false);
         },
         error: () => this.setConnectionError(),
       });
   }
 
   protected changePeriod(period: 'week' | 'month' | 'year'): void {
-    this.notice = '';
+    this.notice.set('');
     this.period = period;
     this.anchor = this.today();
     this.setPeriodRange(period);
@@ -153,26 +153,28 @@ export class App implements OnInit, OnDestroy {
   }
 
   protected backupDatabase(): void {
-    this.backingUp = true;
-    this.error = '';
-    this.notice = '';
+    this.backingUp.set(true);
+    this.error.set('');
+    this.notice.set('');
 
     this.api.backupDatabase()
-      .pipe(finalize(() => (this.backingUp = false)))
+      .pipe(finalize(() => this.backingUp.set(false)))
       .subscribe({
         next: (backup) => {
-          this.notice = `Copia de seguretat creada: ${backup.relativePath}`;
+          this.notice.set(`Copia de seguretat creada: ${backup.relativePath}`);
         },
         error: (response) => {
-          this.error = typeof response.error === 'string'
-            ? response.error
-            : 'No s ha pogut crear la copia de seguretat.';
+          this.error.set(
+            typeof response.error === 'string'
+              ? response.error
+              : 'No s ha pogut crear la copia de seguretat.',
+          );
         },
       });
   }
 
   protected get selectedBudget(): Budget | undefined {
-    return this.budgets.find((budget) => budget.id === this.selectedBudgetId);
+    return this.budgets().find((budget) => budget.id === this.selectedBudgetId);
   }
 
   protected changeSelectedBudget(): void {
@@ -183,38 +185,40 @@ export class App implements OnInit, OnDestroy {
   protected loadBudgets(selectId?: number): void {
     this.api.getBudgets().subscribe({
       next: (budgets) => {
-        this.budgets = budgets;
+        this.budgets.set(budgets);
         if (selectId) {
           this.selectedBudgetId = selectId;
         } else if (!budgets.some((item) => item.id === this.selectedBudgetId)) {
           this.selectedBudgetId = budgets[0]?.id ?? 0;
         }
       },
-      error: () => (this.error = 'No s’han pogut carregar els pressupostos.'),
+      error: () => this.error.set('No s’han pogut carregar els pressupostos.'),
     });
   }
 
   protected createBudget(): void {
     if (!this.budgetForm.name.trim()) {
-      this.error = 'Escriu el nom del pressupost.';
+      this.error.set('Escriu el nom del pressupost.');
       return;
     }
 
-    this.savingBudget = true;
-    this.error = '';
-    this.notice = '';
+    this.savingBudget.set(true);
+    this.error.set('');
+    this.notice.set('');
     this.api.createBudget({ ...this.budgetForm, name: this.budgetForm.name.trim() })
-      .pipe(finalize(() => (this.savingBudget = false)))
+      .pipe(finalize(() => this.savingBudget.set(false)))
       .subscribe({
         next: ({ id }) => {
           this.budgetForm.name = '';
-          this.notice = 'Pressupost creat correctament.';
+          this.notice.set('Pressupost creat correctament.');
           this.loadBudgets(id);
         },
         error: (response) => {
-          this.error = typeof response.error === 'string'
-            ? response.error
-            : 'No s’ha pogut crear el pressupost.';
+          this.error.set(
+            typeof response.error === 'string'
+              ? response.error
+              : 'No s’ha pogut crear el pressupost.',
+          );
         },
       });
   }
@@ -239,27 +243,29 @@ export class App implements OnInit, OnDestroy {
   protected copyBudget(): void {
     const budget = this.selectedBudget;
     if (!budget || !this.budgetCopyForm.name.trim()) {
-      this.error = 'Indica el nom del nou pressupost.';
+      this.error.set('Indica el nom del nou pressupost.');
       return;
     }
 
-    this.savingBudgetCopy = true;
-    this.error = '';
-    this.notice = '';
+    this.savingBudgetCopy.set(true);
+    this.error.set('');
+    this.notice.set('');
     this.api.copyBudget(budget.id, {
       ...this.budgetCopyForm,
       name: this.budgetCopyForm.name.trim(),
-    }).pipe(finalize(() => (this.savingBudgetCopy = false)))
+    }).pipe(finalize(() => this.savingBudgetCopy.set(false)))
       .subscribe({
         next: ({ id }) => {
           this.showBudgetCopyForm = false;
-          this.notice = 'Pressupost copiat. Ja pots adaptar-ne els conceptes.';
+          this.notice.set('Pressupost copiat. Ja pots adaptar-ne els conceptes.');
           this.loadBudgets(id);
         },
         error: (response) => {
-          this.error = typeof response.error === 'string'
-            ? response.error
-            : 'No s’ha pogut copiar el pressupost.';
+          this.error.set(
+            typeof response.error === 'string'
+              ? response.error
+              : 'No s’ha pogut copiar el pressupost.',
+          );
         },
       });
   }
@@ -287,13 +293,13 @@ export class App implements OnInit, OnDestroy {
   protected saveBudgetItem(): void {
     const budget = this.selectedBudget;
     if (!budget || !this.budgetItemForm.description.trim() || !this.budgetItemForm.expectedAmount) {
-      this.error = 'Selecciona un pressupost i indica un concepte i un import.';
+      this.error.set('Selecciona un pressupost i indica un concepte i un import.');
       return;
     }
 
-    this.savingBudgetItem = true;
-    this.error = '';
-    this.notice = '';
+    this.savingBudgetItem.set(true);
+    this.error.set('');
+    this.notice.set('');
     const request = {
       type: this.budgetItemForm.type,
       description: this.budgetItemForm.description.trim(),
@@ -304,19 +310,23 @@ export class App implements OnInit, OnDestroy {
       ? this.api.updateBudgetItem(budget.id, this.editingBudgetItemId, request)
       : this.api.createBudgetItem(budget.id, request);
 
-    operation.pipe(finalize(() => (this.savingBudgetItem = false)))
+    operation.pipe(finalize(() => this.savingBudgetItem.set(false)))
       .subscribe({
         next: () => {
-          this.notice = this.editingBudgetItemId
-            ? 'Concepte actualitzat correctament.'
-            : 'Concepte afegit al pressupost.';
+          this.notice.set(
+            this.editingBudgetItemId
+              ? 'Concepte actualitzat correctament.'
+              : 'Concepte afegit al pressupost.',
+          );
           this.resetBudgetItemForm();
           this.loadBudgets(budget.id);
         },
         error: (response) => {
-          this.error = typeof response.error === 'string'
-            ? response.error
-            : 'No s’ha pogut guardar el concepte.';
+          this.error.set(
+            typeof response.error === 'string'
+              ? response.error
+              : 'No s’ha pogut guardar el concepte.',
+          );
         },
       });
   }
@@ -345,7 +355,7 @@ export class App implements OnInit, OnDestroy {
         }
         this.loadBudgets(budget.id);
       },
-      error: () => (this.error = 'No s’ha pogut eliminar el concepte.'),
+      error: () => this.error.set('No s’ha pogut eliminar el concepte.'),
     });
   }
 
@@ -358,10 +368,10 @@ export class App implements OnInit, OnDestroy {
     this.api.deleteBudget(budget.id).subscribe({
       next: () => {
         this.selectedBudgetId = 0;
-        this.notice = 'Pressupost eliminat.';
+        this.notice.set('Pressupost eliminat.');
         this.loadBudgets();
       },
-      error: () => (this.error = 'No s’ha pogut eliminar el pressupost.'),
+      error: () => this.error.set('No s’ha pogut eliminar el pressupost.'),
     });
   }
 
@@ -398,17 +408,17 @@ export class App implements OnInit, OnDestroy {
 
   protected isCurrentPeriod(): boolean {
     const today = this.today();
-    return this.periodFrom <= today && today <= this.periodTo;
+    return this.periodFrom() <= today && today <= this.periodTo();
   }
 
   protected get typeGroup(): TagGroup | undefined {
-    return this.tagGroups.find(
+    return this.tagGroups().find(
       (group) => group.name.toLocaleLowerCase('ca') === 'tipus',
     );
   }
 
   protected get subtypeGroup(): TagGroup | undefined {
-    return this.tagGroups.find(
+    return this.tagGroups().find(
       (group) => group.name.toLocaleLowerCase('ca') === 'subtipus',
     );
   }
@@ -448,13 +458,13 @@ export class App implements OnInit, OnDestroy {
       !this.transactionForm.amount ||
       !this.transactionForm.description.trim()
     ) {
-      this.error = 'Indica una descripció i un import superior a zero.';
+      this.error.set('Indica una descripció i un import superior a zero.');
       return;
     }
 
-    this.saving = true;
-    this.error = '';
-    this.notice = '';
+    this.saving.set(true);
+    this.error.set('');
+    this.notice.set('');
     this.api
       .createTransaction({
         ...this.transactionForm,
@@ -462,7 +472,7 @@ export class App implements OnInit, OnDestroy {
         description: this.transactionForm.description.trim(),
         tagIds: [...this.selectedTagIds],
       })
-      .pipe(finalize(() => (this.saving = false)))
+      .pipe(finalize(() => this.saving.set(false)))
       .subscribe({
         next: () => {
           this.transactionForm = {
@@ -472,14 +482,15 @@ export class App implements OnInit, OnDestroy {
             description: '',
           };
           this.selectedTagIds.clear();
-          this.notice = 'Moviment guardat correctament.';
+          this.notice.set('Moviment guardat correctament.');
           this.refreshFinancialData();
         },
         error: (response) => {
-          this.error =
+          this.error.set(
             typeof response.error === 'string'
               ? response.error
-              : 'No s’ha pogut guardar el moviment.';
+              : 'No s’ha pogut guardar el moviment.',
+          );
         },
       });
   }
@@ -487,33 +498,33 @@ export class App implements OnInit, OnDestroy {
   protected deleteTransaction(id: number): void {
     this.api.deleteTransaction(id).subscribe({
       next: () => this.refreshFinancialData(),
-      error: () => (this.error = 'No s’ha pogut eliminar el moviment.'),
+      error: () => this.error.set('No s’ha pogut eliminar el moviment.'),
     });
   }
 
   protected createTag(): void {
     if (!this.newTag.tagGroupId || !this.newTag.name.trim()) {
-      this.error = 'Selecciona un grup i escriu el nom del tag.';
+      this.error.set('Selecciona un grup i escriu el nom del tag.');
       return;
     }
 
-    this.savingTag = true;
-    this.error = '';
-    this.notice = '';
+    this.savingTag.set(true);
+    this.error.set('');
+    this.notice.set('');
     this.api
       .createTag({
         ...this.newTag,
         name: this.newTag.name.trim(),
         parentTagId: null,
       })
-      .pipe(finalize(() => (this.savingTag = false)))
+      .pipe(finalize(() => this.savingTag.set(false)))
       .subscribe({
         next: () => {
           this.newTag.name = '';
-          this.notice = 'Tag creat correctament.';
+          this.notice.set('Tag creat correctament.');
           this.loadAll();
         },
-        error: () => (this.error = 'No s’ha pogut crear el tag.'),
+        error: () => this.error.set('No s’ha pogut crear el tag.'),
       });
   }
 
@@ -525,12 +536,13 @@ export class App implements OnInit, OnDestroy {
   }
 
   protected periodLabel(): string {
-    if (!this.summary) {
+    const summary = this.summary();
+    if (!summary) {
       return '';
     }
 
-    return `${this.formatDate(this.summary.from)} – ${this.formatDate(
-      this.summary.to,
+    return `${this.formatDate(summary.from)} – ${this.formatDate(
+      summary.to,
     )}`;
   }
 
@@ -543,9 +555,10 @@ export class App implements OnInit, OnDestroy {
   }
 
   private setConnectionError(): void {
-    this.loading = false;
-    this.error =
-      'No es pot connectar amb l’API. Comprova que el servidor estigui iniciat.';
+    this.loading.set(false);
+    this.error.set(
+      'No es pot connectar amb l’API. Comprova que el servidor estigui iniciat.',
+    );
   }
 
   private activeFilterTagIds(): number[] {
@@ -573,8 +586,8 @@ export class App implements OnInit, OnDestroy {
       to = new Date(today.getFullYear(), 11, 31, 12);
     }
 
-    this.periodFrom = this.toLocalDate(from);
-    this.periodTo = this.toLocalDate(to);
+    this.periodFrom.set(this.toLocalDate(from));
+    this.periodTo.set(this.toLocalDate(to));
   }
 
   private toLocalDate(date: Date): string {

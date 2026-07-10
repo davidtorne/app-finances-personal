@@ -8,33 +8,33 @@
       type="button"
       class="backup-button"
       (click)="backupDatabase()"
-      [disabled]="backingUp"
+      [disabled]="backingUp()"
     >
-      {{ backingUp ? 'Creant copia...' : 'Copia BBDD' }}
+      {{ backingUp() ? 'Creant copia...' : 'Copia BBDD' }}
     </button>
   </header>
 
-  @if (error) {
-    <div class="alert">{{ error }}</div>
+  @if (error()) {
+    <div class="alert">{{ error() }}</div>
   }
-  @if (notice) {
-    <div class="notice">{{ notice }}</div>
+  @if (notice()) {
+    <div class="notice">{{ notice() }}</div>
   }
 
   <section class="summary-grid" aria-label="Resum financer">
     <article class="summary-card balance">
       <span>Saldo del període</span>
-      <strong>{{ formatCurrency(summary?.balance ?? 0) }}</strong>
+      <strong>{{ formatCurrency(summary()?.balance ?? 0) }}</strong>
       <small>{{ periodLabel() }}</small>
     </article>
     <article class="summary-card">
       <span>Ingressos</span>
-      <strong class="positive">{{ formatCurrency(summary?.income ?? 0) }}</strong>
+      <strong class="positive">{{ formatCurrency(summary()?.income ?? 0) }}</strong>
       <small>Total del període seleccionat</small>
     </article>
     <article class="summary-card">
       <span>Despeses</span>
-      <strong class="negative">{{ formatCurrency(summary?.expense ?? 0) }}</strong>
+      <strong class="negative">{{ formatCurrency(summary()?.expense ?? 0) }}</strong>
       <small>Total del període seleccionat</small>
     </article>
   </section>
@@ -76,7 +76,7 @@
             <button
               type="button"
               [class.active]="period === 'week'"
-              (pointerdown)="changePeriod('week'); $event.preventDefault()"
+              (click)="changePeriod('week')"
               (keydown.enter)="changePeriod('week')"
               (keydown.space)="changePeriod('week'); $event.preventDefault()"
             >
@@ -85,7 +85,7 @@
             <button
               type="button"
               [class.active]="period === 'month'"
-              (pointerdown)="changePeriod('month'); $event.preventDefault()"
+              (click)="changePeriod('month')"
               (keydown.enter)="changePeriod('month')"
               (keydown.space)="changePeriod('month'); $event.preventDefault()"
             >
@@ -94,7 +94,7 @@
             <button
               type="button"
               [class.active]="period === 'year'"
-              (pointerdown)="changePeriod('year'); $event.preventDefault()"
+              (click)="changePeriod('year')"
               (keydown.enter)="changePeriod('year')"
               (keydown.space)="changePeriod('year'); $event.preventDefault()"
             >
@@ -104,7 +104,7 @@
           <div class="period-navigation" aria-label="Navegació temporal">
             <button
               type="button"
-              (pointerdown)="navigatePeriod(-1); $event.preventDefault()"
+              (click)="navigatePeriod(-1)"
               (keydown.enter)="navigatePeriod(-1)"
               (keydown.space)="navigatePeriod(-1); $event.preventDefault()"
             >
@@ -112,7 +112,7 @@
             </button>
             <button
               type="button"
-              (pointerdown)="goToCurrentPeriod(); $event.preventDefault()"
+              (click)="goToCurrentPeriod()"
               (keydown.enter)="goToCurrentPeriod()"
               (keydown.space)="goToCurrentPeriod(); $event.preventDefault()"
               [disabled]="isCurrentPeriod()"
@@ -121,7 +121,7 @@
             </button>
             <button
               type="button"
-              (pointerdown)="navigatePeriod(1); $event.preventDefault()"
+              (click)="navigatePeriod(1)"
               (keydown.enter)="navigatePeriod(1)"
               (keydown.space)="navigatePeriod(1); $event.preventDefault()"
               [disabled]="isCurrentPeriod()"
@@ -136,7 +136,7 @@
             <span>Inici</span>
             <input
               type="date"
-              [value]="periodFrom"
+              [value]="periodFrom()"
               readonly
               aria-label="Data d'inici"
             />
@@ -145,7 +145,7 @@
             <span>Final</span>
             <input
               type="date"
-              [value]="periodTo"
+              [value]="periodTo()"
               readonly
               aria-label="Data final"
             />
@@ -160,7 +160,7 @@
           <p class="eyebrow">Anàlisi</p>
           <h2>Totals per tag</h2>
         </div>
-        <span class="count">{{ summary?.tagTotals?.length ?? 0 }} tags</span>
+        <span class="count">{{ summary()?.tagTotals?.length ?? 0 }} tags</span>
       </div>
 
       <div class="tag-summary-filters">
@@ -195,9 +195,9 @@
         }
       </div>
 
-      @if (summary?.tagTotals?.length) {
+      @if (summary()?.tagTotals?.length) {
         <div class="tag-total-list">
-          @for (total of summary?.tagTotals; track total.tagId) {
+          @for (total of summary()?.tagTotals; track total.tagId) {
             <div class="tag-total-row">
               <i [style.background]="total.color"></i>
               <div>
@@ -229,12 +229,12 @@
           <p class="eyebrow">Historial</p>
           <h2>Moviments del període</h2>
         </div>
-        <span class="count">{{ transactions.length }} registres</span>
+        <span class="count">{{ transactions().length }} registres</span>
       </div>
 
-      @if (transactions.length) {
+      @if (transactions().length) {
         <div class="movement-list">
-          @for (transaction of transactions; track transaction.id) {
+          @for (transaction of transactions(); track transaction.id) {
             <article class="movement-row">
               <div
                 class="movement-icon"
@@ -351,7 +351,7 @@
           </div>
 
           <div class="tag-groups">
-            @for (group of tagGroups; track group.id) {
+            @for (group of tagGroups(); track group.id) {
               <fieldset>
                 <legend>
                   {{ group.name }}
@@ -393,8 +393,8 @@
             }
           </div>
 
-          <button class="primary-button" type="submit" [disabled]="saving">
-            {{ saving ? 'Guardant...' : 'Guardar moviment' }}
+          <button class="primary-button" type="submit" [disabled]="saving()">
+            {{ saving() ? 'Guardant...' : 'Guardar moviment' }}
           </button>
         </form>
       </article>
@@ -414,7 +414,7 @@
           <label class="field">
             <span>Grup</span>
             <select [(ngModel)]="newTag.tagGroupId">
-              @for (group of tagGroups; track group.id) {
+              @for (group of tagGroups(); track group.id) {
                 <option [ngValue]="group.id">{{ group.name }}</option>
               }
             </select>
@@ -436,9 +436,9 @@
             class="secondary-button"
             type="button"
             (click)="createTag()"
-            [disabled]="savingTag"
+            [disabled]="savingTag()"
           >
-            {{ savingTag ? 'Afegint...' : 'Afegir tag' }}
+            {{ savingTag() ? 'Afegint...' : 'Afegir tag' }}
           </button>
         </div>
       </article>
@@ -458,8 +458,8 @@
             <label class="field"><span>Data d'inici</span><input name="budget-from" type="date" [(ngModel)]="budgetForm.from" required /></label>
             <label class="field"><span>Data final</span><input name="budget-to" type="date" [(ngModel)]="budgetForm.to" required /></label>
           </div>
-          <button class="secondary-button full-width" type="submit" [disabled]="savingBudget">
-            {{ savingBudget ? 'Creant...' : 'Crear pressupost' }}
+          <button class="secondary-button full-width" type="submit" [disabled]="savingBudget()">
+            {{ savingBudget() ? 'Creant...' : 'Crear pressupost' }}
           </button>
         </form>
       </article>
@@ -483,8 +483,8 @@
         <label class="field budget-selector">
           <span>Pressupost</span>
           <select [(ngModel)]="selectedBudgetId" (ngModelChange)="changeSelectedBudget()">
-            @if (!budgets.length) { <option [ngValue]="0">Encara no n'hi ha cap</option> }
-            @for (budget of budgets; track budget.id) {
+            @if (!budgets().length) { <option [ngValue]="0">Encara no n'hi ha cap</option> }
+            @for (budget of budgets(); track budget.id) {
               <option [ngValue]="budget.id">{{ budget.name }} · {{ formatDate(budget.from) }} - {{ formatDate(budget.to) }}</option>
             }
           </select>
@@ -507,8 +507,8 @@
               <label class="field"><span>Data d'inici</span><input name="copy-budget-from" type="date" [(ngModel)]="budgetCopyForm.from" required /></label>
               <label class="field"><span>Data final</span><input name="copy-budget-to" type="date" [(ngModel)]="budgetCopyForm.to" required /></label>
             </div>
-            <button class="secondary-button full-width" type="submit" [disabled]="savingBudgetCopy">
-              {{ savingBudgetCopy ? 'Copiant...' : 'Crear la còpia' }}
+            <button class="secondary-button full-width" type="submit" [disabled]="savingBudgetCopy()">
+              {{ savingBudgetCopy() ? 'Copiant...' : 'Crear la còpia' }}
             </button>
           </form>
         }
@@ -594,7 +594,7 @@
               </label>
             </div>
             <div class="tag-groups budget-tags">
-              @for (group of tagGroups; track group.id) {
+              @for (group of tagGroups(); track group.id) {
                 <fieldset>
                   <legend>{{ group.name }}</legend>
                   @if (group.selectionMode === 'single') {
@@ -615,8 +615,8 @@
                 </fieldset>
               }
             </div>
-            <button class="primary-button" type="submit" [disabled]="savingBudgetItem">
-              {{ savingBudgetItem ? 'Guardant...' : (editingBudgetItemId ? 'Guardar canvis' : 'Afegir concepte') }}
+            <button class="primary-button" type="submit" [disabled]="savingBudgetItem()">
+              {{ savingBudgetItem() ? 'Guardant...' : (editingBudgetItemId ? 'Guardar canvis' : 'Afegir concepte') }}
             </button>
           </form>
 
