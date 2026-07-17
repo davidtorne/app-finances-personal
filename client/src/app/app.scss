@@ -692,6 +692,62 @@ fieldset select {
   border-radius: 50%;
 }
 
+.description-field {
+  position: relative;
+}
+
+.suggestion-list {
+  position: absolute;
+  z-index: 10;
+  top: 100%;
+  left: 0;
+  right: 0;
+  margin-top: -10px;
+  padding: 6px;
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: #fff;
+  box-shadow: 0 12px 35px rgb(30 41 59 / 12%);
+  list-style: none;
+  max-height: 260px;
+  overflow-y: auto;
+}
+
+.suggestion-item {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  padding: 8px 10px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.suggestion-item:hover,
+.suggestion-item:focus-visible {
+  background: #f1f5f9;
+}
+
+.suggestion-main {
+  display: grid;
+  gap: 4px;
+  min-width: 0;
+}
+
+.suggestion-main .tag-list {
+  margin-top: 0;
+}
+
+.suggestion-amount {
+  white-space: nowrap;
+  font-weight: 700;
+}
+
 .primary-button {
   width: 100%;
   min-height: 48px;

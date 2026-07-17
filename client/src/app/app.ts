@@ -1,7 +1,19 @@
 import { CommonModule } from '@angular/common';
 import { Component, OnDestroy, OnInit, signal } from '@angular/core';
+import { takeUntilDestroyed } from '@angular/core/rxjs-interop';
 import { FormsModule } from '@angular/forms';
-import { finalize, forkJoin, Observable, of, Subscription, switchMap } from 'rxjs';
+import {
+  debounceTime,
+  distinctUntilChanged,
+  finalize,
+  forkJoin,
+  map,
+  Observable,
+  of,
+  Subject,
+  Subscription,
+  switchMap,
+} from 'rxjs';
 import { FinanceApiService } from './finance-api.service';
 import {
   Budget,
@@ -47,6 +59,8 @@ export class App implements OnInit, OnDestroy {
   };
 
   protected selectedTagIds = new Set<number>();
+  protected readonly transactionSuggestions = signal<FinanceTransaction[]>([]);
+  private readonly descriptionInput$ = new Subject<string>();
   protected newTag = {
     tagGroupId: 0,
     name: '',
@@ -75,7 +89,19 @@ export class App implements OnInit, OnDestroy {
 
   private financialDataSubscription?: Subscription;
 
-  constructor(private readonly api: FinanceApiService) {}
+  constructor(private readonly api: FinanceApiService) {
+    this.descriptionInput$
+      .pipe(
+        map((value) => value.trim()),
+        debounceTime(250),
+        distinctUntilChanged(),
+        switchMap((value) =>
+          value.length >= 2 ? this.api.searchTransactions(value) : of([]),
+        ),
+        takeUntilDestroyed(),
+      )
+      .subscribe((suggestions) => this.transactionSuggestions.set(suggestions));
+  }
 
   ngOnInit(): void {
     this.setPeriodRange(this.period);
@@ -482,6 +508,7 @@ export class App implements OnInit, OnDestroy {
             description: '',
           };
           this.selectedTagIds.clear();
+          this.transactionSuggestions.set([]);
           this.notice.set('Moviment guardat correctament.');
           this.refreshFinancialData();
         },
@@ -493,6 +520,25 @@ export class App implements OnInit, OnDestroy {
           );
         },
       });
+  }
+
+  protected onDescriptionInput(value: string): void {
+    this.descriptionInput$.next(value);
+  }
+
+  protected hideSuggestionsSoon(): void {
+    setTimeout(() => this.transactionSuggestions.set([]), 150);
+  }
+
+  protected applyTransactionSuggestion(suggestion: FinanceTransaction): void {
+    this.transactionForm = {
+      ...this.transactionForm,
+      type: suggestion.type,
+      description: suggestion.description,
+      amount: suggestion.amount,
+    };
+    this.selectedTagIds = new Set(suggestion.tags.map((tag) => tag.id));
+    this.transactionSuggestions.set([]);
   }
 
   protected deleteTransaction(id: number): void {

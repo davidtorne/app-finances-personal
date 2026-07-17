@@ -41,6 +41,15 @@ export class FinanceApiService {
     );
   }
 
+  searchTransactions(query: string, limit = 6) {
+    const params = new HttpParams().set('q', query).set('limit', limit);
+
+    return this.http.get<FinanceTransaction[]>(
+      `${this.baseUrl}/transactions/search`,
+      { params },
+    );
+  }
+
   createTransaction(transaction: CreateTransaction) {
     return this.http.post<FinanceTransaction>(
       `${this.baseUrl}/transactions/`,

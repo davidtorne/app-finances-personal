@@ -312,16 +312,52 @@
             </label>
           </div>
 
-          <label class="field">
-            <span>Descripció</span>
-            <input
-              name="description"
-              [(ngModel)]="transactionForm.description"
-              placeholder="Ex. Compra setmanal"
-              maxlength="240"
-              required
-            />
-          </label>
+          <div class="description-field">
+            <label class="field">
+              <span>Descripció</span>
+              <input
+                name="description"
+                [(ngModel)]="transactionForm.description"
+                (ngModelChange)="onDescriptionInput($event)"
+                (focus)="onDescriptionInput(transactionForm.description)"
+                (blur)="hideSuggestionsSoon()"
+                placeholder="Ex. Compra setmanal"
+                maxlength="240"
+                autocomplete="off"
+                required
+              />
+            </label>
+            @if (transactionSuggestions().length) {
+              <ul class="suggestion-list" (mousedown)="$event.preventDefault()">
+                @for (suggestion of transactionSuggestions(); track suggestion.id) {
+                  <li>
+                    <button
+                      type="button"
+                      class="suggestion-item"
+                      (click)="applyTransactionSuggestion(suggestion)"
+                    >
+                      <span class="suggestion-main">
+                        <strong>{{ suggestion.description }}</strong>
+                        <span class="tag-list">
+                          @for (tag of suggestion.tags; track tag.id) {
+                            <span><i [style.background]="tag.color"></i>{{ tag.name }}</span>
+                          }
+                        </span>
+                      </span>
+                      <span
+                        class="suggestion-amount"
+                        [class.positive]="suggestion.type === 'income'"
+                        [class.negative]="suggestion.type === 'expense'"
+                      >
+                        {{ suggestion.type === 'income' ? '+' : '-'
+                        }}{{ formatCurrency(suggestion.amount) }}
+                      </span>
+                    </button>
+                  </li>
+                }
+              </ul>
+            }
+          </div>
 
           <div class="field-row">
             <label class="field">

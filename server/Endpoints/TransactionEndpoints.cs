@@ -53,6 +53,40 @@ public static class TransactionEndpoints
             return transactions.Select(MapTransaction);
         });
 
+        group.MapGet("/search", async (
+            string q,
+            int? limit,
+            FinanceDbContext db) =>
+        {
+            var trimmed = q?.Trim() ?? "";
+            if (trimmed.Length < 2)
+            {
+                return Results.Ok(Array.Empty<TransactionDto>());
+            }
+
+            var take = Math.Clamp(limit ?? 6, 1, 20);
+            var pattern = $"%{trimmed}%";
+
+            var matches = await db.Transactions
+                .AsNoTracking()
+                .Include(item => item.TransactionTags)
+                .ThenInclude(item => item.Tag)
+                .ThenInclude(item => item.TagGroup)
+                .Where(item => EF.Functions.Like(item.Description, pattern))
+                .OrderByDescending(item => item.Date)
+                .ThenByDescending(item => item.Id)
+                .Take(100)
+                .ToListAsync();
+
+            var suggestions = matches
+                .GroupBy(item => item.Description, StringComparer.OrdinalIgnoreCase)
+                .Select(group => group.First())
+                .Take(take)
+                .Select(MapTransaction);
+
+            return Results.Ok(suggestions);
+        });
+
         group.MapPost("/", async (
             CreateTransactionRequest request,
             FinanceDbContext db) =>
