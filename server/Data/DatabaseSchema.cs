@@ -50,4 +50,26 @@ public static class DatabaseSchema
             await addColumn.ExecuteNonQueryAsync();
         }
     }
+
+    public static async Task EnsureFixedExpenseTablesAsync(FinanceDbContext db)
+    {
+        await db.Database.ExecuteSqlRawAsync("""
+            CREATE TABLE IF NOT EXISTS FixedExpenses (
+                Id INTEGER NOT NULL CONSTRAINT PK_FixedExpenses PRIMARY KEY AUTOINCREMENT,
+                Type TEXT NOT NULL DEFAULT 'Expense',
+                Description TEXT NOT NULL,
+                Amount TEXT NOT NULL,
+                Month INTEGER NOT NULL,
+                CreatedAtUtc TEXT NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS FixedExpenseTags (
+                FixedExpenseId INTEGER NOT NULL,
+                TagId INTEGER NOT NULL,
+                CONSTRAINT PK_FixedExpenseTags PRIMARY KEY (FixedExpenseId, TagId),
+                CONSTRAINT FK_FixedExpenseTags_FixedExpenses_FixedExpenseId FOREIGN KEY (FixedExpenseId) REFERENCES FixedExpenses (Id) ON DELETE CASCADE,
+                CONSTRAINT FK_FixedExpenseTags_Tags_TagId FOREIGN KEY (TagId) REFERENCES Tags (Id) ON DELETE RESTRICT
+            );
+            CREATE INDEX IF NOT EXISTS IX_FixedExpenseTags_TagId ON FixedExpenseTags (TagId);
+            """);
+    }
 }

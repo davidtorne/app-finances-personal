@@ -44,6 +44,7 @@ public sealed class Tag
     public ICollection<Tag> Children { get; set; } = [];
     public ICollection<TransactionTag> TransactionTags { get; set; } = [];
     public ICollection<BudgetItemTag> BudgetItemTags { get; set; } = [];
+    public ICollection<FixedExpenseTag> FixedExpenseTags { get; set; } = [];
 }
 
 public sealed class TransactionTag
@@ -79,6 +80,25 @@ public sealed class BudgetItemTag
 {
     public int BudgetItemId { get; set; }
     public BudgetItem BudgetItem { get; set; } = null!;
+    public int TagId { get; set; }
+    public Tag Tag { get; set; } = null!;
+}
+
+public sealed class FixedExpense
+{
+    public int Id { get; set; }
+    public TransactionType Type { get; set; } = TransactionType.Expense;
+    public string Description { get; set; } = string.Empty;
+    public decimal Amount { get; set; }
+    public int Month { get; set; }
+    public DateTime CreatedAtUtc { get; set; } = DateTime.UtcNow;
+    public ICollection<FixedExpenseTag> FixedExpenseTags { get; set; } = [];
+}
+
+public sealed class FixedExpenseTag
+{
+    public int FixedExpenseId { get; set; }
+    public FixedExpense FixedExpense { get; set; } = null!;
     public int TagId { get; set; }
     public Tag Tag { get; set; } = null!;
 }

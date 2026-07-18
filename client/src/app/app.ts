@@ -20,6 +20,7 @@ import {
   BudgetItem,
   FinanceSummary,
   FinanceTransaction,
+  FixedExpense,
   TagGroup,
   TransactionType,
 } from './finance.models';
@@ -31,7 +32,7 @@ import {
   styleUrl: './app.scss',
 })
 export class App implements OnInit, OnDestroy {
-  protected activeSection: 'consultation' | 'entry' | 'budgets' = 'consultation';
+  protected activeSection: 'consultation' | 'entry' | 'budgets' | 'fixed-expenses' = 'consultation';
   protected readonly summary = signal<FinanceSummary | null>(null);
   protected readonly transactions = signal<FinanceTransaction[]>([]);
   protected readonly tagGroups = signal<TagGroup[]>([]);
@@ -87,6 +88,21 @@ export class App implements OnInit, OnDestroy {
     to: '',
   };
 
+  protected readonly fixedExpenses = signal<FixedExpense[]>([]);
+  protected readonly savingFixedExpense = signal(false);
+  protected fixedExpenseForm = {
+    type: 'expense' as TransactionType,
+    description: '',
+    amount: null as number | null,
+    month: new Date().getMonth() + 1,
+  };
+  protected selectedFixedExpenseTagIds = new Set<number>();
+  protected editingFixedExpenseId = 0;
+  protected readonly monthNames = [
+    'Gener', 'Febrer', 'Març', 'Abril', 'Maig', 'Juny',
+    'Juliol', 'Agost', 'Setembre', 'Octubre', 'Novembre', 'Desembre',
+  ];
+
   private financialDataSubscription?: Subscription;
 
   constructor(private readonly api: FinanceApiService) {
@@ -128,6 +144,7 @@ export class App implements OnInit, OnDestroy {
 
     this.refreshFinancialData();
     this.loadBudgets();
+    this.loadFixedExpenses();
   }
 
   protected refreshFinancialData(): void {
@@ -171,10 +188,12 @@ export class App implements OnInit, OnDestroy {
     this.refreshFinancialData();
   }
 
-  protected showSection(section: 'consultation' | 'entry' | 'budgets'): void {
+  protected showSection(section: 'consultation' | 'entry' | 'budgets' | 'fixed-expenses'): void {
     this.activeSection = section;
     if (section === 'budgets') {
       this.loadBudgets();
+    } else if (section === 'fixed-expenses') {
+      this.loadFixedExpenses();
     }
   }
 
@@ -398,6 +417,112 @@ export class App implements OnInit, OnDestroy {
         this.loadBudgets();
       },
       error: () => this.error.set('No s’ha pogut eliminar el pressupost.'),
+    });
+  }
+
+  protected get fixedExpensesTotal(): { income: number; expense: number; balance: number } {
+    const items = this.fixedExpenses();
+    const income = items
+      .filter((item) => item.type === 'income')
+      .reduce((sum, item) => sum + item.amount, 0);
+    const expense = items
+      .filter((item) => item.type === 'expense')
+      .reduce((sum, item) => sum + item.amount, 0);
+    return { income, expense, balance: income - expense };
+  }
+
+  protected loadFixedExpenses(): void {
+    this.api.getFixedExpenses().subscribe({
+      next: (fixedExpenses) => this.fixedExpenses.set(fixedExpenses),
+      error: () => this.error.set('No s’han pogut carregar les despeses fixes.'),
+    });
+  }
+
+  protected selectSingleFixedExpenseTag(group: TagGroup, value: string): void {
+    group.tags.forEach((tag) => this.selectedFixedExpenseTagIds.delete(tag.id));
+    if (value) {
+      this.selectedFixedExpenseTagIds.add(Number(value));
+    }
+  }
+
+  protected selectedSingleFixedExpenseTag(group: TagGroup): string {
+    const selected = group.tags.find((tag) => this.selectedFixedExpenseTagIds.has(tag.id));
+    return selected ? String(selected.id) : '';
+  }
+
+  protected toggleFixedExpenseTag(tagId: number, selected: boolean): void {
+    if (selected) {
+      this.selectedFixedExpenseTagIds.add(tagId);
+    } else {
+      this.selectedFixedExpenseTagIds.delete(tagId);
+    }
+  }
+
+  protected saveFixedExpense(): void {
+    if (!this.fixedExpenseForm.description.trim() || !this.fixedExpenseForm.amount) {
+      this.error.set('Indica un concepte i un import superior a zero.');
+      return;
+    }
+
+    this.savingFixedExpense.set(true);
+    this.error.set('');
+    this.notice.set('');
+    const request = {
+      type: this.fixedExpenseForm.type,
+      description: this.fixedExpenseForm.description.trim(),
+      amount: this.fixedExpenseForm.amount,
+      month: this.fixedExpenseForm.month,
+      tagIds: [...this.selectedFixedExpenseTagIds],
+    };
+    const operation: Observable<unknown> = this.editingFixedExpenseId
+      ? this.api.updateFixedExpense(this.editingFixedExpenseId, request)
+      : this.api.createFixedExpense(request);
+
+    operation.pipe(finalize(() => this.savingFixedExpense.set(false)))
+      .subscribe({
+        next: () => {
+          this.notice.set(
+            this.editingFixedExpenseId
+              ? 'Despesa fixa actualitzada correctament.'
+              : 'Despesa fixa afegida correctament.',
+          );
+          this.resetFixedExpenseForm();
+          this.loadFixedExpenses();
+        },
+        error: (response) => {
+          this.error.set(
+            typeof response.error === 'string'
+              ? response.error
+              : 'No s’ha pogut guardar la despesa fixa.',
+          );
+        },
+      });
+  }
+
+  protected editFixedExpense(item: FixedExpense): void {
+    this.editingFixedExpenseId = item.id;
+    this.fixedExpenseForm = {
+      type: item.type,
+      description: item.description,
+      amount: item.amount,
+      month: item.month,
+    };
+    this.selectedFixedExpenseTagIds = new Set(item.tags.map((tag) => tag.id));
+  }
+
+  protected cancelFixedExpenseEdit(): void {
+    this.resetFixedExpenseForm();
+  }
+
+  protected deleteFixedExpense(id: number): void {
+    this.api.deleteFixedExpense(id).subscribe({
+      next: () => {
+        if (this.editingFixedExpenseId === id) {
+          this.resetFixedExpenseForm();
+        }
+        this.loadFixedExpenses();
+      },
+      error: () => this.error.set('No s’ha pogut eliminar la despesa fixa.'),
     });
   }
 
@@ -659,6 +784,17 @@ export class App implements OnInit, OnDestroy {
       expectedAmount: null,
     };
     this.selectedBudgetTagIds.clear();
+  }
+
+  private resetFixedExpenseForm(): void {
+    this.editingFixedExpenseId = 0;
+    this.fixedExpenseForm = {
+      type: 'expense',
+      description: '',
+      amount: null,
+      month: new Date().getMonth() + 1,
+    };
+    this.selectedFixedExpenseTagIds.clear();
   }
 
   private nextBudgetDates(fromValue: string, toValue: string): { from: string; to: string } {

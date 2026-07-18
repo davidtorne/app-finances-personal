@@ -13,6 +13,8 @@ public sealed class FinanceDbContext(DbContextOptions<FinanceDbContext> options)
     public DbSet<Budget> Budgets => Set<Budget>();
     public DbSet<BudgetItem> BudgetItems => Set<BudgetItem>();
     public DbSet<BudgetItemTag> BudgetItemTags => Set<BudgetItemTag>();
+    public DbSet<FixedExpense> FixedExpenses => Set<FixedExpense>();
+    public DbSet<FixedExpenseTag> FixedExpenseTags => Set<FixedExpenseTag>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -75,6 +77,26 @@ public sealed class FinanceDbContext(DbContextOptions<FinanceDbContext> options)
                 .OnDelete(DeleteBehavior.Cascade);
             entity.HasOne(item => item.Tag)
                 .WithMany(item => item.BudgetItemTags)
+                .HasForeignKey(item => item.TagId)
+                .OnDelete(DeleteBehavior.Restrict);
+        });
+
+        modelBuilder.Entity<FixedExpense>(entity =>
+        {
+            entity.Property(item => item.Description).HasMaxLength(240);
+            entity.Property(item => item.Type).HasConversion<string>();
+            entity.Property(item => item.Amount).HasPrecision(18, 2);
+        });
+
+        modelBuilder.Entity<FixedExpenseTag>(entity =>
+        {
+            entity.HasKey(item => new { item.FixedExpenseId, item.TagId });
+            entity.HasOne(item => item.FixedExpense)
+                .WithMany(item => item.FixedExpenseTags)
+                .HasForeignKey(item => item.FixedExpenseId)
+                .OnDelete(DeleteBehavior.Cascade);
+            entity.HasOne(item => item.Tag)
+                .WithMany(item => item.FixedExpenseTags)
                 .HasForeignKey(item => item.TagId)
                 .OnDelete(DeleteBehavior.Restrict);
         });

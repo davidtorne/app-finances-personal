@@ -111,6 +111,23 @@ export interface CreateBudgetItem {
   tagIds: number[];
 }
 
+export interface FixedExpense {
+  id: number;
+  type: TransactionType;
+  description: string;
+  amount: number;
+  month: number;
+  tags: TransactionTag[];
+}
+
+export interface CreateFixedExpense {
+  type: TransactionType;
+  description: string;
+  amount: number;
+  month: number;
+  tagIds: number[];
+}
+
 export interface BackupResult {
   fileName: string;
   relativePath: string;

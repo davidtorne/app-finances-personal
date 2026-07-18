@@ -5,10 +5,12 @@ import {
   Budget,
   CreateBudget,
   CreateBudgetItem,
+  CreateFixedExpense,
   CreateTag,
   CreateTransaction,
   FinanceSummary,
   FinanceTransaction,
+  FixedExpense,
   SummaryPeriod,
   TagGroup,
 } from './finance.models';
@@ -115,6 +117,28 @@ export class FinanceApiService {
 
   deleteBudget(budgetId: number) {
     return this.http.delete<void>(`${this.baseUrl}/budgets/${budgetId}`);
+  }
+
+  getFixedExpenses() {
+    return this.http.get<FixedExpense[]>(`${this.baseUrl}/fixed-expenses/`);
+  }
+
+  createFixedExpense(fixedExpense: CreateFixedExpense) {
+    return this.http.post<{ id: number }>(
+      `${this.baseUrl}/fixed-expenses/`,
+      fixedExpense,
+    );
+  }
+
+  updateFixedExpense(id: number, fixedExpense: CreateFixedExpense) {
+    return this.http.put<void>(
+      `${this.baseUrl}/fixed-expenses/${id}`,
+      fixedExpense,
+    );
+  }
+
+  deleteFixedExpense(id: number) {
+    return this.http.delete<void>(`${this.baseUrl}/fixed-expenses/${id}`);
   }
 
   backupDatabase() {

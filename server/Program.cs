@@ -32,6 +32,7 @@ using (var scope = app.Services.CreateScope())
     var db = scope.ServiceProvider.GetRequiredService<FinanceDbContext>();
     await db.Database.EnsureCreatedAsync();
     await DatabaseSchema.EnsureBudgetTablesAsync(db);
+    await DatabaseSchema.EnsureFixedExpenseTablesAsync(db);
     await DatabaseSeeder.SeedAsync(db);
 }
 
@@ -40,6 +41,7 @@ app.MapTagEndpoints();
 app.MapTransactionEndpoints();
 app.MapSummaryEndpoints();
 app.MapBudgetEndpoints();
+app.MapFixedExpenseEndpoints();
 app.MapBackupEndpoints();
 
 if (Directory.Exists(app.Environment.WebRootPath))

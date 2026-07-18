@@ -98,3 +98,18 @@ public sealed record CreateBudgetItemRequest(
     string Description,
     decimal ExpectedAmount,
     IReadOnlyCollection<int> TagIds);
+
+public sealed record FixedExpenseDto(
+    int Id,
+    string Type,
+    string Description,
+    decimal Amount,
+    int Month,
+    IReadOnlyCollection<TransactionTagDto> Tags);
+
+public sealed record CreateFixedExpenseRequest(
+    string Type,
+    string Description,
+    decimal Amount,
+    int Month,
+    IReadOnlyCollection<int> TagIds);

@@ -61,6 +61,13 @@
     >
       Pressupostos
     </button>
+    <button
+      type="button"
+      [class.active]="activeSection === 'fixed-expenses'"
+      (click)="showSection('fixed-expenses')"
+    >
+      Despeses fixes
+    </button>
   </nav>
 
   @if (activeSection === 'consultation') {
@@ -479,7 +486,7 @@
         </div>
       </article>
     </section>
-  } @else {
+  } @else if (activeSection === 'budgets') {
     <section class="budget-layout">
       <article class="panel budget-create">
         <div class="panel-heading">
@@ -682,6 +689,174 @@
           }
         } @else {
           <div class="empty-state large"><strong>Comença creant un pressupost</strong><span>Després hi podràs afegir conceptes, imports i tags.</span></div>
+        }
+      </article>
+    </section>
+  } @else if (activeSection === 'fixed-expenses') {
+    <section class="entry-grid">
+      <article class="panel">
+        <div class="panel-heading">
+          <div>
+            <p class="eyebrow">Planificació anual</p>
+            <h2>{{ editingFixedExpenseId ? 'Editar despesa fixa' : 'Afegir despesa fixa' }}</h2>
+          </div>
+          @if (editingFixedExpenseId) {
+            <button type="button" class="text-action" (click)="cancelFixedExpenseEdit()">Cancel·lar edició</button>
+          }
+        </div>
+
+        <form (ngSubmit)="saveFixedExpense()">
+          <div class="type-switch">
+            <label [class.selected]="fixedExpenseForm.type === 'expense'">
+              <input type="radio" name="fixed-expense-type" value="expense" [(ngModel)]="fixedExpenseForm.type" />
+              Despesa
+            </label>
+            <label [class.selected]="fixedExpenseForm.type === 'income'">
+              <input type="radio" name="fixed-expense-type" value="income" [(ngModel)]="fixedExpenseForm.type" />
+              Ingrés
+            </label>
+          </div>
+
+          <label class="field">
+            <span>Concepte</span>
+            <input
+              name="fixed-expense-description"
+              [(ngModel)]="fixedExpenseForm.description"
+              placeholder="Ex. Assegurança cotxe"
+              maxlength="240"
+              required
+            />
+          </label>
+
+          <div class="field-row">
+            <label class="field">
+              <span>Import</span>
+              <div class="amount-input">
+                <input
+                  type="number"
+                  name="fixed-expense-amount"
+                  [(ngModel)]="fixedExpenseForm.amount"
+                  min="0.01"
+                  step="0.01"
+                  placeholder="0,00"
+                  required
+                />
+                <b>€</b>
+              </div>
+            </label>
+            <label class="field">
+              <span>Mes</span>
+              <select name="fixed-expense-month" [(ngModel)]="fixedExpenseForm.month">
+                @for (name of monthNames; track $index) {
+                  <option [ngValue]="$index + 1">{{ name }}</option>
+                }
+              </select>
+            </label>
+          </div>
+
+          <div class="tag-groups">
+            @for (group of tagGroups(); track group.id) {
+              <fieldset>
+                <legend>{{ group.name }}</legend>
+                @if (group.selectionMode === 'single') {
+                  <select
+                    [ngModel]="selectedSingleFixedExpenseTag(group)"
+                    (ngModelChange)="selectSingleFixedExpenseTag(group, $event)"
+                    [name]="'fixed-expense-tag-group-' + group.id"
+                  >
+                    <option value="">Sense seleccionar</option>
+                    @for (tag of group.tags; track tag.id) {
+                      <option [value]="tag.id">{{ tag.name }}</option>
+                    }
+                  </select>
+                } @else {
+                  <div class="tag-picker">
+                    @for (tag of group.tags; track tag.id) {
+                      <label
+                        class="tag-option"
+                        [class.selected]="selectedFixedExpenseTagIds.has(tag.id)"
+                      >
+                        <input
+                          type="checkbox"
+                          [checked]="selectedFixedExpenseTagIds.has(tag.id)"
+                          (change)="toggleFixedExpenseTag(tag.id, $any($event.target).checked)"
+                        />
+                        <i [style.background]="tag.color"></i>
+                        {{ tag.name }}
+                      </label>
+                    }
+                  </div>
+                }
+              </fieldset>
+            }
+          </div>
+
+          <button class="primary-button" type="submit" [disabled]="savingFixedExpense()">
+            {{ savingFixedExpense() ? 'Guardant...' : (editingFixedExpenseId ? 'Guardar canvis' : 'Afegir despesa fixa') }}
+          </button>
+        </form>
+      </article>
+
+      <article class="panel">
+        <div class="panel-heading">
+          <div>
+            <p class="eyebrow">Resum anual</p>
+            <h2>Despeses fixes</h2>
+          </div>
+          <span class="count">{{ fixedExpenses().length }} conceptes</span>
+        </div>
+
+        <div class="budget-summary">
+          <div>
+            <span>Ingressos anuals</span>
+            <strong class="positive">{{ formatCurrency(fixedExpensesTotal.income) }}</strong>
+          </div>
+          <div>
+            <span>Despeses anuals</span>
+            <strong class="negative">{{ formatCurrency(fixedExpensesTotal.expense) }}</strong>
+          </div>
+        </div>
+
+        @if (fixedExpenses().length) {
+          <div class="budget-item-list">
+            @for (item of fixedExpenses(); track item.id) {
+              <article class="movement-row">
+                <div class="movement-icon" [class.income]="item.type === 'income'">
+                  {{ item.type === 'income' ? '+' : '-' }}
+                </div>
+                <div class="movement-main">
+                  <strong>{{ item.description }}</strong>
+                  <span>{{ monthNames[item.month - 1] }}</span>
+                  <div class="tag-list">
+                    @for (tag of item.tags; track tag.id) {
+                      <span><i [style.background]="tag.color"></i>{{ tag.name }}</span>
+                    }
+                  </div>
+                </div>
+                <strong
+                  class="movement-amount"
+                  [class.positive]="item.type === 'income'"
+                  [class.negative]="item.type === 'expense'"
+                >
+                  {{ item.type === 'income' ? '+' : '-' }}{{ formatCurrency(item.amount) }}
+                </strong>
+                <button type="button" class="edit-button" (click)="editFixedExpense(item)">Editar</button>
+                <button
+                  type="button"
+                  class="delete-button"
+                  (click)="deleteFixedExpense(item.id)"
+                  aria-label="Eliminar despesa fixa"
+                >
+                  ×
+                </button>
+              </article>
+            }
+          </div>
+        } @else {
+          <div class="empty-state large">
+            <strong>Encara no hi ha despeses fixes</strong>
+            <span>Afegeix la primera quota, assegurança o despesa anual recurrent.</span>
+          </div>
         }
       </article>
     </section>
