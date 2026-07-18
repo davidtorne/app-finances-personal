@@ -336,7 +336,7 @@
             </label>
             @if (transactionSuggestions().length) {
               <ul class="suggestion-list" (mousedown)="$event.preventDefault()">
-                @for (suggestion of transactionSuggestions(); track suggestion.id) {
+                @for (suggestion of transactionSuggestions(); track $index) {
                   <li>
                     <button
                       type="button"
@@ -345,6 +345,9 @@
                     >
                       <span class="suggestion-main">
                         <strong>{{ suggestion.description }}</strong>
+                        @if (suggestion.monthLabel) {
+                          <span class="suggestion-fixed-badge">Despesa fixa · {{ suggestion.monthLabel }}</span>
+                        }
                         <span class="tag-list">
                           @for (tag of suggestion.tags; track tag.id) {
                             <span><i [style.background]="tag.color"></i>{{ tag.name }}</span>

@@ -22,8 +22,18 @@ import {
   FinanceTransaction,
   FixedExpense,
   TagGroup,
+  TransactionTag,
   TransactionType,
 } from './finance.models';
+
+interface TransactionSuggestion {
+  kind: 'transaction' | 'fixed-expense';
+  type: TransactionType;
+  description: string;
+  amount: number;
+  tags: TransactionTag[];
+  monthLabel?: string;
+}
 
 @Component({
   selector: 'app-root',
@@ -60,7 +70,7 @@ export class App implements OnInit, OnDestroy {
   };
 
   protected selectedTagIds = new Set<number>();
-  protected readonly transactionSuggestions = signal<FinanceTransaction[]>([]);
+  protected readonly transactionSuggestions = signal<TransactionSuggestion[]>([]);
   private readonly descriptionInput$ = new Subject<string>();
   protected newTag = {
     tagGroupId: 0,
@@ -111,9 +121,37 @@ export class App implements OnInit, OnDestroy {
         map((value) => value.trim()),
         debounceTime(250),
         distinctUntilChanged(),
-        switchMap((value) =>
-          value.length >= 2 ? this.api.searchTransactions(value) : of([]),
-        ),
+        switchMap((value) => {
+          if (value.length < 2) {
+            return of<TransactionSuggestion[]>([]);
+          }
+
+          const lowerValue = value.toLocaleLowerCase('ca');
+          const fixedExpenseSuggestions: TransactionSuggestion[] = this.fixedExpenses()
+            .filter((item) => item.description.toLocaleLowerCase('ca').includes(lowerValue))
+            .slice(0, 5)
+            .map((item) => ({
+              kind: 'fixed-expense' as const,
+              type: item.type,
+              description: item.description,
+              amount: item.amount,
+              tags: item.tags,
+              monthLabel: this.monthNames[item.month - 1],
+            }));
+
+          return this.api.searchTransactions(value).pipe(
+            map((transactions): TransactionSuggestion[] => [
+              ...fixedExpenseSuggestions,
+              ...transactions.map((item) => ({
+                kind: 'transaction' as const,
+                type: item.type,
+                description: item.description,
+                amount: item.amount,
+                tags: item.tags,
+              })),
+            ]),
+          );
+        }),
         takeUntilDestroyed(),
       )
       .subscribe((suggestions) => this.transactionSuggestions.set(suggestions));
@@ -655,7 +693,7 @@ export class App implements OnInit, OnDestroy {
     setTimeout(() => this.transactionSuggestions.set([]), 150);
   }
 
-  protected applyTransactionSuggestion(suggestion: FinanceTransaction): void {
+  protected applyTransactionSuggestion(suggestion: TransactionSuggestion): void {
     this.transactionForm = {
       ...this.transactionForm,
       type: suggestion.type,

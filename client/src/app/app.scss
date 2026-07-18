@@ -748,6 +748,17 @@ fieldset select {
   font-weight: 700;
 }
 
+.suggestion-fixed-badge {
+  display: inline-flex;
+  align-self: flex-start;
+  padding: 2px 8px;
+  border-radius: 999px;
+  color: #92400e;
+  background: #fef3c7;
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+
 .primary-button {
   width: 100%;
   min-height: 48px;
