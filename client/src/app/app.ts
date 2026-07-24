@@ -68,6 +68,7 @@ export class App implements OnInit, OnDestroy {
     date: this.today(),
     description: '',
   };
+  protected transactionAmountText = '';
 
   protected selectedTagIds = new Set<number>();
   protected readonly transactionSuggestions = signal<TransactionSuggestion[]>([]);
@@ -670,6 +671,7 @@ export class App implements OnInit, OnDestroy {
             date: this.today(),
             description: '',
           };
+          this.transactionAmountText = '';
           this.selectedTagIds.clear();
           this.transactionSuggestions.set([]);
           this.notice.set('Moviment guardat correctament.');
@@ -693,6 +695,11 @@ export class App implements OnInit, OnDestroy {
     setTimeout(() => this.transactionSuggestions.set([]), 150);
   }
 
+  protected onAmountInput(value: string): void {
+    this.transactionAmountText = value;
+    this.transactionForm.amount = this.parseAmount(value);
+  }
+
   protected applyTransactionSuggestion(suggestion: TransactionSuggestion): void {
     this.transactionForm = {
       ...this.transactionForm,
@@ -700,6 +707,7 @@ export class App implements OnInit, OnDestroy {
       description: suggestion.description,
       amount: suggestion.amount,
     };
+    this.transactionAmountText = this.formatAmount(suggestion.amount);
     this.selectedTagIds = new Set(suggestion.tags.map((tag) => tag.id));
     this.transactionSuggestions.set([]);
   }
@@ -797,6 +805,20 @@ export class App implements OnInit, OnDestroy {
 
     this.periodFrom.set(this.toLocalDate(from));
     this.periodTo.set(this.toLocalDate(to));
+  }
+
+  private formatAmount(value: number): string {
+    return String(value).replace('.', ',');
+  }
+
+  private parseAmount(value: string): number | null {
+    const normalized = value.trim().replace(',', '.');
+    if (!normalized) {
+      return null;
+    }
+
+    const parsed = Number(normalized);
+    return Number.isFinite(parsed) ? parsed : null;
   }
 
   private toLocalDate(date: Date): string {
