@@ -8,11 +8,14 @@ import {
   CreateFixedExpense,
   CreateTag,
   CreateTransaction,
+  DriveStatus,
   FinanceSummary,
   FinanceTransaction,
   FixedExpense,
+  SaveDriveSettings,
   SummaryPeriod,
   TagGroup,
+  WeeklyForecast,
 } from './finance.models';
 
 @Injectable({ providedIn: 'root' })
@@ -74,6 +77,11 @@ export class FinanceApiService {
     return this.http.get<FinanceSummary>(`${this.baseUrl}/summary`, {
       params,
     });
+  }
+
+  getWeeklyForecast(anchor: string) {
+    const params = new HttpParams().set('anchor', anchor);
+    return this.http.get<WeeklyForecast>(`${this.baseUrl}/weekly-forecast`, { params });
   }
 
   createTag(tag: CreateTag) {
@@ -143,5 +151,17 @@ export class FinanceApiService {
 
   backupDatabase() {
     return this.http.post<BackupResult>(`${this.baseUrl}/backups/database`, {});
+  }
+
+  getDriveStatus() {
+    return this.http.get<DriveStatus>(`${this.baseUrl}/drive/status`);
+  }
+
+  saveDriveSettings(settings: SaveDriveSettings) {
+    return this.http.post<void>(`${this.baseUrl}/drive/settings`, settings);
+  }
+
+  disconnectDrive() {
+    return this.http.post<void>(`${this.baseUrl}/drive/disconnect`, {});
   }
 }

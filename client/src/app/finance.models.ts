@@ -52,6 +52,27 @@ export interface FinanceSummary {
   tagTotals: TagTotal[];
 }
 
+export interface WeeklyForecastWeek {
+  weekNumber: number;
+  from: string;
+  to: string;
+  isCurrent: boolean;
+  isEstimate: boolean;
+  expectedIncome: number;
+  expectedExpense: number;
+  remainingBalance: number;
+  tagTotals: TagTotal[];
+}
+
+export interface WeeklyForecast {
+  monthFrom: string;
+  monthTo: string;
+  monthIncome: number;
+  incomeSource: 'budget' | 'actual';
+  fixedExpensesTotal: number;
+  weeks: WeeklyForecastWeek[];
+}
+
 export interface CreateTransaction {
   type: TransactionType;
   amount: number;
@@ -133,4 +154,20 @@ export interface BackupResult {
   relativePath: string;
   sizeBytes: number;
   createdAt: string;
+  driveUploadStatus: 'skipped' | 'uploaded' | 'failed';
+  driveError: string | null;
+}
+
+export interface DriveStatus {
+  hasCredentials: boolean;
+  clientId: string | null;
+  connected: boolean;
+  connectedAccountEmail: string | null;
+  autoUpload: boolean;
+}
+
+export interface SaveDriveSettings {
+  clientId: string;
+  clientSecret?: string;
+  autoUpload: boolean;
 }

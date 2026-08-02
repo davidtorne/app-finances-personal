@@ -4,14 +4,27 @@
       <p class="eyebrow">Control personal</p>
       <h1>Les meves finances</h1>
     </div>
-    <button
-      type="button"
-      class="backup-button"
-      (click)="backupDatabase()"
-      [disabled]="backingUp()"
-    >
-      {{ backingUp() ? 'Creant copia...' : 'Copia BBDD' }}
-    </button>
+    <div class="backup-actions">
+      <button
+        type="button"
+        class="backup-button"
+        (click)="backupDatabase()"
+        [disabled]="backingUp()"
+      >
+        {{ backingUp() ? 'Creant copia...' : 'Copia BBDD' }}
+      </button>
+      <button
+        type="button"
+        class="drive-settings-toggle"
+        (click)="toggleDriveSettings()"
+        aria-label="Configurar còpia a Google Drive"
+      >
+        Drive
+        @if (driveStatus(); as status) {
+          <span class="drive-dot" [class.connected]="status.connected"></span>
+        }
+      </button>
+    </div>
   </header>
 
   @if (error()) {
@@ -19,6 +32,81 @@
   }
   @if (notice()) {
     <div class="notice">{{ notice() }}</div>
+  }
+
+  @if (showDriveSettings) {
+    <section class="panel drive-settings-panel">
+      <div class="panel-heading">
+        <div>
+          <p class="eyebrow">Còpies de seguretat</p>
+          <h2>Configuració de Google Drive</h2>
+        </div>
+        <button type="button" class="text-action" (click)="toggleDriveSettings()">Tancar</button>
+      </div>
+
+      <p class="panel-description">
+        Crea unes credencials OAuth de tipus "Aplicació d'escriptori" a
+        <a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noopener">Google Cloud Console</a>,
+        amb l'API de Google Drive activada, i enganxa aquí el Client ID i el Client Secret.
+      </p>
+
+      <form (ngSubmit)="saveDriveSettings()">
+        <label class="field">
+          <span>Client ID</span>
+          <input
+            name="drive-client-id"
+            [(ngModel)]="driveSettingsForm.clientId"
+            placeholder="xxxxxxxx.apps.googleusercontent.com"
+            required
+          />
+        </label>
+        <label class="field">
+          <span>Client Secret</span>
+          <input
+            name="drive-client-secret"
+            type="password"
+            [(ngModel)]="driveSettingsForm.clientSecret"
+            [placeholder]="driveStatus()?.hasCredentials ? 'Deixa-ho en blanc per mantenir el que ja tens desat' : ''"
+          />
+        </label>
+        <label class="tag-option drive-auto-upload">
+          <input type="checkbox" name="drive-auto-upload" [(ngModel)]="driveSettingsForm.autoUpload" />
+          Pujar automàticament cada còpia a Drive
+        </label>
+        <button class="secondary-button full-width" type="submit" [disabled]="savingDriveSettings()">
+          {{ savingDriveSettings() ? 'Desant...' : 'Desar configuració' }}
+        </button>
+      </form>
+
+      @if (driveStatus(); as status) {
+        <div class="drive-status">
+          @if (status.connected) {
+            <p class="positive">Connectat com a {{ status.connectedAccountEmail }}</p>
+            <button
+              type="button"
+              class="text-danger"
+              (click)="disconnectDrive()"
+              [disabled]="disconnectingDrive()"
+            >
+              {{ disconnectingDrive() ? 'Desconnectant...' : 'Desconnectar' }}
+            </button>
+          } @else {
+            <p>No connectat amb Google Drive.</p>
+            <button
+              type="button"
+              class="secondary-button"
+              (click)="connectDrive()"
+              [disabled]="!status.hasCredentials"
+            >
+              Connectar amb Google Drive
+            </button>
+            @if (!status.hasCredentials) {
+              <p class="panel-description">Desa primer el Client ID i el Client Secret.</p>
+            }
+          }
+        </div>
+      }
+    </section>
   }
 
   <section class="summary-grid" aria-label="Resum financer">
@@ -67,6 +155,13 @@
       (click)="showSection('fixed-expenses')"
     >
       Despeses fixes
+    </button>
+    <button
+      type="button"
+      [class.active]="activeSection === 'weekly-forecast'"
+      (click)="showSection('weekly-forecast')"
+    >
+      Previsió setmanal
     </button>
   </nav>
 
@@ -863,5 +958,131 @@
         }
       </article>
     </section>
+  } @else if (activeSection === 'weekly-forecast') {
+    <section class="panel weekly-forecast-toolbar">
+      <div>
+        <p class="eyebrow">Previsió</p>
+        <h2>Previsió setmanal</h2>
+      </div>
+      <div class="period-navigation" aria-label="Navegació de mes">
+        <button type="button" (click)="navigateForecastPeriod(-1)">&lt; Anterior</button>
+        <span class="forecast-month-label">{{ forecastPeriodLabel() }}</span>
+        <button
+          type="button"
+          (click)="goToCurrentForecastPeriod()"
+          [disabled]="isCurrentForecastPeriod()"
+        >
+          Actual
+        </button>
+        <button
+          type="button"
+          (click)="navigateForecastPeriod(1)"
+          [disabled]="isCurrentForecastPeriod()"
+        >
+          Següent &gt;
+        </button>
+      </div>
+    </section>
+
+    @if (weeklyForecast(); as forecast) {
+      <section class="panel weekly-forecast">
+        <div class="panel-heading">
+          <div>
+            <p class="eyebrow">Ingressos previstos del mes</p>
+            <h2>{{ formatCurrency(forecast.monthIncome) }}</h2>
+          </div>
+          <span class="count">
+            {{ forecast.incomeSource === 'budget' ? 'Segons pressupost' : 'Segons ingressos introduïts' }}
+          </span>
+        </div>
+
+        @if (forecast.fixedExpensesTotal) {
+          <p class="panel-description">
+            Inclou {{ formatCurrency(forecast.fixedExpensesTotal) }} de despeses fixes previstes aquest mes.
+          </p>
+        }
+
+        <div class="weekly-forecast-list">
+          @for (week of forecast.weeks; track week.weekNumber) {
+            <article
+              class="weekly-forecast-item"
+              [class.expanded]="expandedWeekNumber === week.weekNumber"
+            >
+              <button
+                type="button"
+                class="weekly-forecast-row"
+                [class.current]="week.isCurrent"
+                (click)="toggleWeekDetail(week.weekNumber)"
+              >
+                <div class="weekly-forecast-main">
+                  <strong>Setmana {{ week.weekNumber }}</strong>
+                  <span>{{ formatDate(week.from) }} – {{ formatDate(week.to) }}</span>
+                </div>
+                <div class="weekly-forecast-expense">
+                  <span>{{ week.isEstimate ? 'Despesa estimada' : 'Despesa real' }}</span>
+                  <b>{{ formatCurrency(week.expectedExpense) }}</b>
+                </div>
+                <div class="weekly-forecast-remaining">
+                  <span>Et queda</span>
+                  <strong
+                    [class.negative]="week.remainingBalance < 0"
+                    [class.positive]="week.remainingBalance >= 0"
+                  >
+                    {{ formatCurrency(week.remainingBalance) }}
+                  </strong>
+                </div>
+              </button>
+
+              @if (expandedWeekNumber === week.weekNumber) {
+                <div class="weekly-forecast-detail">
+                  <div class="weekly-forecast-detail-summary">
+                    <div>
+                      <span>{{ week.isEstimate ? 'Ingressos estimats' : 'Ingressos reals' }}</span>
+                      <strong class="positive">{{ formatCurrency(week.expectedIncome) }}</strong>
+                    </div>
+                    <div>
+                      <span>{{ week.isEstimate ? 'Despeses estimades' : 'Despeses reals' }}</span>
+                      <strong class="negative">{{ formatCurrency(week.expectedExpense) }}</strong>
+                    </div>
+                  </div>
+
+                  @if (week.tagTotals.length) {
+                    <div class="tag-total-list">
+                      @for (total of week.tagTotals; track total.tagId) {
+                        <div class="tag-total-row">
+                          <i [style.background]="total.color"></i>
+                          <div>
+                            <strong>{{ total.tagName }}</strong>
+                            <span>{{ total.groupName }}</span>
+                          </div>
+                          <div class="tag-amounts">
+                            @if (total.income) {
+                              <small class="positive">+{{ formatCurrency(total.income) }}</small>
+                            }
+                            @if (total.expense) {
+                              <b>{{ formatCurrency(total.expense) }}</b>
+                            }
+                          </div>
+                        </div>
+                      }
+                    </div>
+                  } @else {
+                    <div class="empty-state">
+                      <span>
+                        {{
+                          week.isEstimate
+                            ? 'No hi ha prou historial per estimar aquesta setmana.'
+                            : 'Encara no hi ha moviments aquesta setmana.'
+                        }}
+                      </span>
+                    </div>
+                  }
+                </div>
+              }
+            </article>
+          }
+        </div>
+      </section>
+    }
   }
 </main>

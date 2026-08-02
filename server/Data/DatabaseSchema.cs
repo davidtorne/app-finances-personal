@@ -72,4 +72,19 @@ public static class DatabaseSchema
             CREATE INDEX IF NOT EXISTS IX_FixedExpenseTags_TagId ON FixedExpenseTags (TagId);
             """);
     }
+
+    public static async Task EnsureDriveSettingsTableAsync(FinanceDbContext db)
+    {
+        await db.Database.ExecuteSqlRawAsync("""
+            CREATE TABLE IF NOT EXISTS DriveSettings (
+                Id INTEGER NOT NULL CONSTRAINT PK_DriveSettings PRIMARY KEY,
+                ClientId TEXT NULL,
+                ClientSecret TEXT NULL,
+                RefreshToken TEXT NULL,
+                ConnectedAccountEmail TEXT NULL,
+                FolderId TEXT NULL,
+                AutoUpload INTEGER NOT NULL DEFAULT 1
+            );
+            """);
+    }
 }

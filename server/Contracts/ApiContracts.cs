@@ -54,6 +54,25 @@ public sealed record SummaryDto(
     decimal Balance,
     IReadOnlyCollection<TagTotalDto> TagTotals);
 
+public sealed record WeeklyForecastWeekDto(
+    int WeekNumber,
+    DateOnly From,
+    DateOnly To,
+    bool IsCurrent,
+    bool IsEstimate,
+    decimal ExpectedIncome,
+    decimal ExpectedExpense,
+    decimal RemainingBalance,
+    IReadOnlyCollection<TagTotalDto> TagTotals);
+
+public sealed record WeeklyForecastDto(
+    DateOnly MonthFrom,
+    DateOnly MonthTo,
+    decimal MonthIncome,
+    string IncomeSource,
+    decimal FixedExpensesTotal,
+    IReadOnlyCollection<WeeklyForecastWeekDto> Weeks);
+
 public sealed record TagTotalDto(
     int TagId,
     string TagName,
@@ -113,3 +132,23 @@ public sealed record CreateFixedExpenseRequest(
     decimal Amount,
     int Month,
     IReadOnlyCollection<int> TagIds);
+
+public sealed record DriveStatusDto(
+    bool HasCredentials,
+    string? ClientId,
+    bool Connected,
+    string? ConnectedAccountEmail,
+    bool AutoUpload);
+
+public sealed record SaveDriveSettingsRequest(
+    string ClientId,
+    string? ClientSecret,
+    bool AutoUpload);
+
+public sealed record BackupResultDto(
+    string FileName,
+    string RelativePath,
+    long SizeBytes,
+    DateTime CreatedAt,
+    string DriveUploadStatus,
+    string? DriveError);

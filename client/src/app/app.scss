@@ -39,6 +39,53 @@
   cursor: default;
 }
 
+.backup-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.drive-settings-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  min-height: 42px;
+  padding: 0 14px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  color: #475569;
+  background: #fff;
+  font-weight: 700;
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.drive-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #cbd5e1;
+}
+
+.drive-dot.connected {
+  background: #059669;
+}
+
+.drive-settings-panel {
+  margin-bottom: 24px;
+}
+
+.drive-auto-upload {
+  margin-bottom: 16px;
+}
+
+.drive-status {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  margin-top: 4px;
+}
+
 h1,
 h2,
 h3,
@@ -466,6 +513,110 @@ select:focus {
   margin: -10px 0 20px;
   color: #64748b;
   line-height: 1.55;
+}
+
+.weekly-forecast-toolbar {
+  justify-content: space-between;
+}
+
+.weekly-forecast-toolbar .period-navigation {
+  gap: 12px;
+}
+
+.forecast-month-label {
+  min-width: 130px;
+  color: #172554;
+  font-weight: 700;
+  text-align: center;
+}
+
+.weekly-forecast-list {
+  display: grid;
+  gap: 10px;
+}
+
+.weekly-forecast-item {
+  border-radius: 12px;
+  overflow: hidden;
+}
+
+.weekly-forecast-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  width: 100%;
+  padding: 14px;
+  border: 1px solid #edf1f5;
+  border-radius: 12px;
+  background: #fff;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+
+.weekly-forecast-row.current {
+  border-color: #93c5fd;
+  background: #eff6ff;
+}
+
+.weekly-forecast-item.expanded .weekly-forecast-row {
+  border-radius: 12px 12px 0 0;
+}
+
+.weekly-forecast-main {
+  display: grid;
+  gap: 3px;
+  flex: 1;
+}
+
+.weekly-forecast-main span {
+  color: #94a3b8;
+  font-size: 0.76rem;
+}
+
+.weekly-forecast-expense,
+.weekly-forecast-remaining {
+  display: grid;
+  gap: 3px;
+  text-align: right;
+}
+
+.weekly-forecast-expense span,
+.weekly-forecast-remaining span {
+  color: #94a3b8;
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+
+.weekly-forecast-detail {
+  padding: 16px 14px;
+  border: 1px solid #edf1f5;
+  border-top: 0;
+  border-radius: 0 0 12px 12px;
+  background: #f8fafc;
+}
+
+.weekly-forecast-detail-summary {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+  margin-bottom: 14px;
+}
+
+.weekly-forecast-detail-summary > div {
+  display: flex;
+  gap: 5px;
+  padding: 12px;
+  border-radius: 12px;
+  background: #fff;
+  flex-direction: column;
+}
+
+.weekly-forecast-detail-summary span {
+  color: #64748b;
+  font-size: 0.72rem;
+  font-weight: 700;
 }
 
 .tag-manager-fields {

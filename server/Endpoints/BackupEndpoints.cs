@@ -1,6 +1,8 @@
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
+using PersonalFinances.Api.Contracts;
 using PersonalFinances.Api.Data;
+using PersonalFinances.Api.Services;
 
 namespace PersonalFinances.Api.Endpoints;
 
@@ -10,7 +12,7 @@ public static class BackupEndpoints
     {
         var group = app.MapGroup("/api/backups");
 
-        group.MapPost("/database", async (FinanceDbContext db, IWebHostEnvironment environment) =>
+        group.MapPost("/database", async (FinanceDbContext db, IWebHostEnvironment environment, GoogleDriveService drive) =>
         {
             var databasePath = db.Database.GetDbConnection().DataSource;
             if (string.IsNullOrWhiteSpace(databasePath) || !File.Exists(databasePath))
@@ -32,13 +34,32 @@ public static class BackupEndpoints
             ((SqliteConnection)db.Database.GetDbConnection()).BackupDatabase(destination);
 
             var info = new FileInfo(backupPath);
-            return Results.Ok(new
+
+            var driveSettings = await drive.GetOrCreateSettingsAsync();
+            var driveUploadStatus = "skipped";
+            string? driveError = null;
+
+            if (!string.IsNullOrWhiteSpace(driveSettings.RefreshToken) && driveSettings.AutoUpload)
             {
-                fileName = backupFileName,
-                relativePath = Path.Combine("data", "backups", backupFileName),
-                sizeBytes = info.Length,
-                createdAt = info.CreationTime,
-            });
+                try
+                {
+                    await drive.UploadBackupAsync(backupPath, backupFileName);
+                    driveUploadStatus = "uploaded";
+                }
+                catch (Exception ex)
+                {
+                    driveUploadStatus = "failed";
+                    driveError = ex.Message;
+                }
+            }
+
+            return Results.Ok(new BackupResultDto(
+                backupFileName,
+                Path.Combine("data", "backups", backupFileName),
+                info.Length,
+                info.CreationTime,
+                driveUploadStatus,
+                driveError));
         });
 
         return app;

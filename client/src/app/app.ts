@@ -18,12 +18,14 @@ import { FinanceApiService } from './finance-api.service';
 import {
   Budget,
   BudgetItem,
+  DriveStatus,
   FinanceSummary,
   FinanceTransaction,
   FixedExpense,
   TagGroup,
   TransactionTag,
   TransactionType,
+  WeeklyForecast,
 } from './finance.models';
 
 interface TransactionSuggestion {
@@ -42,7 +44,7 @@ interface TransactionSuggestion {
   styleUrl: './app.scss',
 })
 export class App implements OnInit, OnDestroy {
-  protected activeSection: 'consultation' | 'entry' | 'budgets' | 'fixed-expenses' = 'consultation';
+  protected activeSection: 'consultation' | 'entry' | 'budgets' | 'fixed-expenses' | 'weekly-forecast' = 'consultation';
   protected readonly summary = signal<FinanceSummary | null>(null);
   protected readonly transactions = signal<FinanceTransaction[]>([]);
   protected readonly tagGroups = signal<TagGroup[]>([]);
@@ -61,6 +63,16 @@ export class App implements OnInit, OnDestroy {
   protected readonly backingUp = signal(false);
   protected readonly error = signal('');
   protected readonly notice = signal('');
+
+  protected readonly driveStatus = signal<DriveStatus | null>(null);
+  protected readonly savingDriveSettings = signal(false);
+  protected readonly disconnectingDrive = signal(false);
+  protected showDriveSettings = false;
+  protected driveSettingsForm = {
+    clientId: '',
+    clientSecret: '',
+    autoUpload: true,
+  };
 
   protected transactionForm = {
     type: 'expense' as TransactionType,
@@ -113,6 +125,10 @@ export class App implements OnInit, OnDestroy {
     'Gener', 'Febrer', 'Març', 'Abril', 'Maig', 'Juny',
     'Juliol', 'Agost', 'Setembre', 'Octubre', 'Novembre', 'Desembre',
   ];
+
+  protected readonly weeklyForecast = signal<WeeklyForecast | null>(null);
+  protected forecastAnchor = this.today();
+  protected expandedWeekNumber: number | null = null;
 
   private financialDataSubscription?: Subscription;
 
@@ -184,6 +200,8 @@ export class App implements OnInit, OnDestroy {
     this.refreshFinancialData();
     this.loadBudgets();
     this.loadFixedExpenses();
+    this.loadDriveStatus();
+    this.loadWeeklyForecast();
   }
 
   protected refreshFinancialData(): void {
@@ -219,6 +237,51 @@ export class App implements OnInit, OnDestroy {
       });
   }
 
+  protected loadWeeklyForecast(): void {
+    this.expandedWeekNumber = null;
+    this.api.getWeeklyForecast(this.forecastAnchor).subscribe({
+      next: (forecast) => this.weeklyForecast.set(forecast),
+      error: () => this.weeklyForecast.set(null),
+    });
+  }
+
+  protected toggleWeekDetail(weekNumber: number): void {
+    this.expandedWeekNumber = this.expandedWeekNumber === weekNumber ? null : weekNumber;
+  }
+
+  protected navigateForecastPeriod(direction: -1 | 1): void {
+    if (direction === 1 && this.isCurrentForecastPeriod()) {
+      return;
+    }
+
+    const anchorDate = new Date(`${this.forecastAnchor}T12:00:00`);
+    anchorDate.setDate(1);
+    anchorDate.setMonth(anchorDate.getMonth() + direction);
+    this.forecastAnchor = this.toLocalDate(anchorDate);
+    this.loadWeeklyForecast();
+  }
+
+  protected goToCurrentForecastPeriod(): void {
+    if (this.isCurrentForecastPeriod()) {
+      return;
+    }
+
+    this.forecastAnchor = this.today();
+    this.loadWeeklyForecast();
+  }
+
+  protected isCurrentForecastPeriod(): boolean {
+    const today = new Date();
+    const anchorDate = new Date(`${this.forecastAnchor}T12:00:00`);
+    return today.getFullYear() === anchorDate.getFullYear()
+      && today.getMonth() === anchorDate.getMonth();
+  }
+
+  protected forecastPeriodLabel(): string {
+    const anchorDate = new Date(`${this.forecastAnchor}T12:00:00`);
+    return `${this.monthNames[anchorDate.getMonth()]} ${anchorDate.getFullYear()}`;
+  }
+
   protected changePeriod(period: 'week' | 'month' | 'year'): void {
     this.notice.set('');
     this.period = period;
@@ -227,12 +290,14 @@ export class App implements OnInit, OnDestroy {
     this.refreshFinancialData();
   }
 
-  protected showSection(section: 'consultation' | 'entry' | 'budgets' | 'fixed-expenses'): void {
+  protected showSection(section: 'consultation' | 'entry' | 'budgets' | 'fixed-expenses' | 'weekly-forecast'): void {
     this.activeSection = section;
     if (section === 'budgets') {
       this.loadBudgets();
     } else if (section === 'fixed-expenses') {
       this.loadFixedExpenses();
+    } else if (section === 'weekly-forecast') {
+      this.loadWeeklyForecast();
     }
   }
 
@@ -245,7 +310,14 @@ export class App implements OnInit, OnDestroy {
       .pipe(finalize(() => this.backingUp.set(false)))
       .subscribe({
         next: (backup) => {
-          this.notice.set(`Copia de seguretat creada: ${backup.relativePath}`);
+          if (backup.driveUploadStatus === 'uploaded') {
+            this.notice.set(`Copia de seguretat creada i pujada a Google Drive: ${backup.relativePath}`);
+          } else if (backup.driveUploadStatus === 'failed') {
+            this.notice.set(`Copia de seguretat creada: ${backup.relativePath}`);
+            this.error.set(`No s’ha pogut pujar a Google Drive: ${backup.driveError}`);
+          } else {
+            this.notice.set(`Copia de seguretat creada: ${backup.relativePath}`);
+          }
         },
         error: (response) => {
           this.error.set(
@@ -254,6 +326,85 @@ export class App implements OnInit, OnDestroy {
               : 'No s ha pogut crear la copia de seguretat.',
           );
         },
+      });
+  }
+
+  protected toggleDriveSettings(): void {
+    this.showDriveSettings = !this.showDriveSettings;
+    if (this.showDriveSettings) {
+      this.loadDriveStatus();
+    }
+  }
+
+  protected loadDriveStatus(): void {
+    this.api.getDriveStatus().subscribe({
+      next: (status) => {
+        this.driveStatus.set(status);
+        this.driveSettingsForm = {
+          clientId: status.clientId ?? '',
+          clientSecret: '',
+          autoUpload: status.autoUpload,
+        };
+      },
+      error: () => this.error.set('No s’ha pogut carregar la configuració de Google Drive.'),
+    });
+  }
+
+  protected saveDriveSettings(): void {
+    if (!this.driveSettingsForm.clientId.trim()) {
+      this.error.set('Indica el Client ID de Google.');
+      return;
+    }
+
+    this.savingDriveSettings.set(true);
+    this.error.set('');
+    this.notice.set('');
+    this.api
+      .saveDriveSettings({
+        clientId: this.driveSettingsForm.clientId.trim(),
+        clientSecret: this.driveSettingsForm.clientSecret.trim() || undefined,
+        autoUpload: this.driveSettingsForm.autoUpload,
+      })
+      .pipe(finalize(() => this.savingDriveSettings.set(false)))
+      .subscribe({
+        next: () => {
+          this.notice.set('Configuració de Google Drive desada.');
+          this.loadDriveStatus();
+        },
+        error: (response) => {
+          this.error.set(
+            typeof response.error === 'string'
+              ? response.error
+              : 'No s’ha pogut desar la configuració de Google Drive.',
+          );
+        },
+      });
+  }
+
+  protected connectDrive(): void {
+    const popup = window.open('/api/drive/connect', '_blank', 'width=520,height=680');
+    if (!popup) {
+      return;
+    }
+
+    const checkClosed = setInterval(() => {
+      if (popup.closed) {
+        clearInterval(checkClosed);
+        this.loadDriveStatus();
+      }
+    }, 500);
+  }
+
+  protected disconnectDrive(): void {
+    this.disconnectingDrive.set(true);
+    this.api.disconnectDrive()
+      .pipe(finalize(() => this.disconnectingDrive.set(false)))
+      .subscribe({
+        next: () => {
+          this.notice.set('S’ha desconnectat Google Drive.');
+          this.loadDriveStatus();
+        },
+        error: () => this.error.set('No s’ha pogut desconnectar Google Drive.'),
       });
   }
 
