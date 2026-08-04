@@ -12,6 +12,7 @@ import {
   FinanceSummary,
   FinanceTransaction,
   FixedExpense,
+  ForecastSettings,
   SaveDriveSettings,
   SummaryPeriod,
   TagGroup,
@@ -82,6 +83,14 @@ export class FinanceApiService {
   getWeeklyForecast(anchor: string) {
     const params = new HttpParams().set('anchor', anchor);
     return this.http.get<WeeklyForecast>(`${this.baseUrl}/weekly-forecast`, { params });
+  }
+
+  getForecastSettings() {
+    return this.http.get<ForecastSettings>(`${this.baseUrl}/forecast-settings/`);
+  }
+
+  saveForecastSettings(settings: ForecastSettings) {
+    return this.http.post<void>(`${this.baseUrl}/forecast-settings/`, settings);
   }
 
   createTag(tag: CreateTag) {

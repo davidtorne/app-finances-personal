@@ -73,6 +73,10 @@ public sealed record WeeklyForecastDto(
     decimal FixedExpensesTotal,
     IReadOnlyCollection<WeeklyForecastWeekDto> Weeks);
 
+public sealed record ForecastSettingsDto(IReadOnlyCollection<int> ExcludedTagIds);
+
+public sealed record SaveForecastSettingsRequest(IReadOnlyCollection<int> ExcludedTagIds);
+
 public sealed record TagTotalDto(
     int TagId,
     string TagName,

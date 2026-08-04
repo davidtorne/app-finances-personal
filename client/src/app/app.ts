@@ -22,6 +22,7 @@ import {
   FinanceSummary,
   FinanceTransaction,
   FixedExpense,
+  ForecastSettings,
   TagGroup,
   TransactionTag,
   TransactionType,
@@ -129,6 +130,9 @@ export class App implements OnInit, OnDestroy {
   protected readonly weeklyForecast = signal<WeeklyForecast | null>(null);
   protected forecastAnchor = this.today();
   protected expandedWeekNumber: number | null = null;
+  protected showForecastSettings = false;
+  protected excludedSubtypeIds = new Set<number>();
+  protected readonly savingForecastSettings = signal(false);
 
   private financialDataSubscription?: Subscription;
 
@@ -280,6 +284,46 @@ export class App implements OnInit, OnDestroy {
   protected forecastPeriodLabel(): string {
     const anchorDate = new Date(`${this.forecastAnchor}T12:00:00`);
     return `${this.monthNames[anchorDate.getMonth()]} ${anchorDate.getFullYear()}`;
+  }
+
+  protected toggleForecastSettings(): void {
+    this.showForecastSettings = !this.showForecastSettings;
+    if (this.showForecastSettings) {
+      this.loadForecastSettings();
+    }
+  }
+
+  protected loadForecastSettings(): void {
+    this.api.getForecastSettings().subscribe({
+      next: (settings) => {
+        this.excludedSubtypeIds = new Set(settings.excludedTagIds);
+      },
+      error: () => this.error.set('No s’ha pogut carregar la configuració de la previsió.'),
+    });
+  }
+
+  protected toggleExcludedSubtype(tagId: number, excluded: boolean): void {
+    if (excluded) {
+      this.excludedSubtypeIds.add(tagId);
+    } else {
+      this.excludedSubtypeIds.delete(tagId);
+    }
+  }
+
+  protected saveForecastSettings(): void {
+    this.savingForecastSettings.set(true);
+    this.error.set('');
+    this.notice.set('');
+    this.api
+      .saveForecastSettings({ excludedTagIds: [...this.excludedSubtypeIds] })
+      .pipe(finalize(() => this.savingForecastSettings.set(false)))
+      .subscribe({
+        next: () => {
+          this.notice.set('Configuració de la previsió desada.');
+          this.loadWeeklyForecast();
+        },
+        error: () => this.error.set('No s’ha pogut desar la configuració de la previsió.'),
+      });
   }
 
   protected changePeriod(period: 'week' | 'month' | 'year'): void {

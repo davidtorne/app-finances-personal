@@ -45,6 +45,7 @@ public sealed class Tag
     public ICollection<TransactionTag> TransactionTags { get; set; } = [];
     public ICollection<BudgetItemTag> BudgetItemTags { get; set; } = [];
     public ICollection<FixedExpenseTag> FixedExpenseTags { get; set; } = [];
+    public ICollection<ForecastExcludedTag> ForecastExclusion { get; set; } = [];
 }
 
 public sealed class TransactionTag
@@ -112,4 +113,10 @@ public sealed class DriveSettings
     public string? ConnectedAccountEmail { get; set; }
     public string? FolderId { get; set; }
     public bool AutoUpload { get; set; } = true;
+}
+
+public sealed class ForecastExcludedTag
+{
+    public int TagId { get; set; }
+    public Tag Tag { get; set; } = null!;
 }

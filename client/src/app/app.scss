@@ -519,6 +519,12 @@ select:focus {
   justify-content: space-between;
 }
 
+.weekly-forecast-toolbar-actions {
+  display: flex;
+  align-items: center;
+  gap: 18px;
+}
+
 .weekly-forecast-toolbar .period-navigation {
   gap: 12px;
 }

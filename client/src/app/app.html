@@ -964,25 +964,67 @@
         <p class="eyebrow">Previsió</p>
         <h2>Previsió setmanal</h2>
       </div>
-      <div class="period-navigation" aria-label="Navegació de mes">
-        <button type="button" (click)="navigateForecastPeriod(-1)">&lt; Anterior</button>
-        <span class="forecast-month-label">{{ forecastPeriodLabel() }}</span>
-        <button
-          type="button"
-          (click)="goToCurrentForecastPeriod()"
-          [disabled]="isCurrentForecastPeriod()"
-        >
-          Actual
-        </button>
-        <button
-          type="button"
-          (click)="navigateForecastPeriod(1)"
-          [disabled]="isCurrentForecastPeriod()"
-        >
-          Següent &gt;
+      <div class="weekly-forecast-toolbar-actions">
+        <div class="period-navigation" aria-label="Navegació de mes">
+          <button type="button" (click)="navigateForecastPeriod(-1)">&lt; Anterior</button>
+          <span class="forecast-month-label">{{ forecastPeriodLabel() }}</span>
+          <button
+            type="button"
+            (click)="goToCurrentForecastPeriod()"
+            [disabled]="isCurrentForecastPeriod()"
+          >
+            Actual
+          </button>
+          <button
+            type="button"
+            (click)="navigateForecastPeriod(1)"
+            [disabled]="isCurrentForecastPeriod()"
+          >
+            Següent &gt;
+          </button>
+        </div>
+        <button type="button" class="text-action" (click)="toggleForecastSettings()">
+          {{ showForecastSettings ? 'Tancar' : 'Exclusions' }}
         </button>
       </div>
     </section>
+
+    @if (showForecastSettings) {
+      <section class="panel">
+        <div class="panel-heading">
+          <div>
+            <p class="eyebrow">Configuració</p>
+            <h2>Exclou subtipus de l'estimació</h2>
+          </div>
+        </div>
+        <p class="panel-description">
+          Els subtipus marcats no es tindran en compte en calcular la mitjana històrica per a les setmanes
+          futures. Les setmanes ja passades o l'actual sempre mostren la despesa real, incloent-hi aquests
+          subtipus.
+        </p>
+        <div class="tag-picker">
+          @for (tag of subtypeGroup?.tags ?? []; track tag.id) {
+            <label class="tag-option" [class.selected]="excludedSubtypeIds.has(tag.id)">
+              <input
+                type="checkbox"
+                [checked]="excludedSubtypeIds.has(tag.id)"
+                (change)="toggleExcludedSubtype(tag.id, $any($event.target).checked)"
+              />
+              <i [style.background]="tag.color"></i>
+              {{ tag.name }}
+            </label>
+          }
+        </div>
+        <button
+          class="secondary-button full-width"
+          type="button"
+          (click)="saveForecastSettings()"
+          [disabled]="savingForecastSettings()"
+        >
+          {{ savingForecastSettings() ? 'Desant...' : 'Desar exclusions' }}
+        </button>
+      </section>
+    }
 
     @if (weeklyForecast(); as forecast) {
       <section class="panel weekly-forecast">
@@ -998,7 +1040,8 @@
 
         @if (forecast.fixedExpensesTotal) {
           <p class="panel-description">
-            Inclou {{ formatCurrency(forecast.fixedExpensesTotal) }} de despeses fixes previstes aquest mes.
+            Inclou {{ formatCurrency(forecast.fixedExpensesTotal) }} de despeses fixes previstes aquest mes,
+            situades a la setmana on s'han pagat altres anys.
           </p>
         }
 

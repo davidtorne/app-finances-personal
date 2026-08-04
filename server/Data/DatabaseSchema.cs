@@ -87,4 +87,14 @@ public static class DatabaseSchema
             );
             """);
     }
+
+    public static async Task EnsureForecastExcludedTagsTableAsync(FinanceDbContext db)
+    {
+        await db.Database.ExecuteSqlRawAsync("""
+            CREATE TABLE IF NOT EXISTS ForecastExcludedTags (
+                TagId INTEGER NOT NULL CONSTRAINT PK_ForecastExcludedTags PRIMARY KEY,
+                CONSTRAINT FK_ForecastExcludedTags_Tags_TagId FOREIGN KEY (TagId) REFERENCES Tags (Id) ON DELETE CASCADE
+            );
+            """);
+    }
 }

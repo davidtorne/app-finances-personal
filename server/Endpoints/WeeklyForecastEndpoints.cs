@@ -27,6 +27,11 @@ public static class WeeklyForecastEndpoints
             var monthEnd = monthStart.AddMonths(1).AddDays(-1);
             var today = DateOnly.FromDateTime(DateTime.Today);
 
+            var excludedTagIds = await db.ForecastExcludedTags
+                .AsNoTracking()
+                .Select(item => item.TagId)
+                .ToHashSetAsync();
+
             var (monthIncome, incomeSource) = await GetMonthIncomeAsync(db, monthStart, monthEnd);
 
             var currentMonthFixedExpenses = await db.FixedExpenses
@@ -36,10 +41,15 @@ public static class WeeklyForecastEndpoints
                 .ThenInclude(tag => tag.TagGroup)
                 .Where(item => item.Month == anchorDate.Month)
                 .ToListAsync();
+            currentMonthFixedExpenses = currentMonthFixedExpenses
+                .Where(item => !item.FixedExpenseTags.Any(link => excludedTagIds.Contains(link.TagId)))
+                .ToList();
+
+            var (fixedExpensesByWeek, fixedIncomeByWeek, fixedTagContributionsByWeek) =
+                await AssignFixedExpensesToWeeksAsync(db, currentMonthFixedExpenses, anchorDate.Year, anchorDate.Month);
             var fixedExpensesTotal = currentMonthFixedExpenses
                 .Where(item => item.Type == TransactionType.Expense)
                 .Sum(item => item.Amount);
-            var fixedExpensePerWeek = fixedExpensesTotal / WeekDayRanges.Length;
 
             var historyStart = monthStart.AddMonths(-HistoryMonths);
             var historicalTransactions = await db.Transactions
@@ -49,6 +59,9 @@ public static class WeeklyForecastEndpoints
                 .ThenInclude(tag => tag.TagGroup)
                 .Where(item => item.Date >= historyStart && item.Date < monthStart)
                 .ToListAsync();
+            historicalTransactions = historicalTransactions
+                .Where(item => !item.TransactionTags.Any(link => excludedTagIds.Contains(link.TagId)))
+                .ToList();
 
             var weeks = new List<WeeklyForecastWeekDto>();
             var cumulativeExpense = 0m;
@@ -67,10 +80,11 @@ public static class WeeklyForecastEndpoints
 
                 if (isEstimate)
                 {
-                    weekIncome = GetHistoricalAverage(historicalTransactions, TransactionType.Income, monthStart, startDay, endDay);
+                    weekIncome = GetHistoricalAverage(historicalTransactions, TransactionType.Income, monthStart, startDay, endDay)
+                        + fixedIncomeByWeek[i];
                     weekExpense = GetHistoricalAverage(historicalTransactions, TransactionType.Expense, monthStart, startDay, endDay)
-                        + fixedExpensePerWeek;
-                    tagTotals = BuildEstimatedTagTotals(historicalTransactions, currentMonthFixedExpenses, monthStart, startDay, endDay);
+                        + fixedExpensesByWeek[i];
+                    tagTotals = BuildEstimatedTagTotals(historicalTransactions, fixedTagContributionsByWeek[i], monthStart, startDay, endDay);
                 }
                 else
                 {
@@ -139,6 +153,98 @@ public static class WeeklyForecastEndpoints
         return (actualIncome, "actual");
     }
 
+    /// <summary>
+    /// For each current-month fixed expense, finds the most recent real transaction with a matching
+    /// description (searching the whole history, any year) and uses the day it happened to decide which
+    /// week bucket to place the (non-fractioned) amount in. Falls back to week 1 if there's no match.
+    /// Amounts are only assigned to weeks that are still in the future, to avoid double-counting a fixed
+    /// expense that already shows up in this month's real transactions.
+    /// </summary>
+    private static async Task<(decimal[] ExpenseByWeek, decimal[] IncomeByWeek, List<(Tag Tag, decimal Amount, bool IsIncome)>[] TagContributionsByWeek)> AssignFixedExpensesToWeeksAsync(
+        FinanceDbContext db,
+        IReadOnlyCollection<FixedExpense> fixedExpenses,
+        int year,
+        int month)
+    {
+        var expenseByWeek = new decimal[WeekDayRanges.Length];
+        var incomeByWeek = new decimal[WeekDayRanges.Length];
+        var tagContributionsByWeek = new List<(Tag, decimal, bool)>[WeekDayRanges.Length];
+        for (var i = 0; i < tagContributionsByWeek.Length; i++)
+        {
+            tagContributionsByWeek[i] = [];
+        }
+
+        var today = DateOnly.FromDateTime(DateTime.Today);
+
+        // Loaded once and matched in memory: real transaction descriptions are often shorter/looser than
+        // the fixed expense's own label (e.g. fixed expense "Domini davidtorne.com" vs a real movement
+        // just called "domini"), so a strict "transaction contains the full label" SQL match misses these.
+        var matchCandidates = await db.Transactions
+            .AsNoTracking()
+            .Select(item => new { item.Type, item.Date, item.Description })
+            .ToListAsync();
+
+        foreach (var fixedExpense in fixedExpenses)
+        {
+            var normalizedFixedDescription = fixedExpense.Description.Trim().ToLowerInvariant();
+            var lastMatch = matchCandidates
+                .Where(item => item.Type == fixedExpense.Type)
+                .Where(item =>
+                {
+                    var normalizedTransactionDescription = item.Description.Trim().ToLowerInvariant();
+                    if (normalizedTransactionDescription.Length == 0)
+                    {
+                        return false;
+                    }
+
+                    return normalizedTransactionDescription.Contains(normalizedFixedDescription)
+                        || (normalizedTransactionDescription.Length >= 3
+                            && normalizedFixedDescription.Contains(normalizedTransactionDescription));
+                })
+                .OrderByDescending(item => item.Date)
+                .FirstOrDefault();
+
+            var day = lastMatch?.Date.Day ?? 1;
+            var weekIndex = GetWeekIndexForDay(day);
+            var weekFrom = new DateOnly(year, month, WeekDayRanges[weekIndex].Start);
+
+            if (weekFrom <= today)
+            {
+                continue;
+            }
+
+            if (fixedExpense.Type == TransactionType.Income)
+            {
+                incomeByWeek[weekIndex] += fixedExpense.Amount;
+            }
+            else
+            {
+                expenseByWeek[weekIndex] += fixedExpense.Amount;
+            }
+
+            foreach (var link in fixedExpense.FixedExpenseTags)
+            {
+                tagContributionsByWeek[weekIndex].Add((link.Tag, fixedExpense.Amount, fixedExpense.Type == TransactionType.Income));
+            }
+        }
+
+        return (expenseByWeek, incomeByWeek, tagContributionsByWeek);
+    }
+
+    private static int GetWeekIndexForDay(int day)
+    {
+        for (var i = 0; i < WeekDayRanges.Length; i++)
+        {
+            var (start, end) = WeekDayRanges[i];
+            if (day >= start && (end == 0 || day <= end))
+            {
+                return i;
+            }
+        }
+
+        return WeekDayRanges.Length - 1;
+    }
+
     private static (DateOnly From, DateOnly To) GetHistoricalRange(DateOnly monthStart, int monthsAgo, int startDay, int endDay)
     {
         var historicalMonth = monthStart.AddMonths(-monthsAgo);
@@ -171,7 +277,7 @@ public static class WeeklyForecastEndpoints
 
     private static IReadOnlyCollection<TagTotalDto> BuildEstimatedTagTotals(
         IReadOnlyCollection<FinanceTransaction> historicalTransactions,
-        IReadOnlyCollection<FixedExpense> currentMonthFixedExpenses,
+        IReadOnlyCollection<(Tag Tag, decimal Amount, bool IsIncome)> fixedTagContributions,
         DateOnly monthStart,
         int startDay,
         int endDay)
@@ -200,20 +306,16 @@ public static class WeeklyForecastEndpoints
             }
         }
 
-        foreach (var fixedExpense in currentMonthFixedExpenses)
+        foreach (var (tag, amount, isIncome) in fixedTagContributions)
         {
-            var share = fixedExpense.Amount / WeekDayRanges.Length;
-            foreach (var link in fixedExpense.FixedExpenseTags)
+            var accumulator = GetOrCreateAccumulator(accumulators, tag);
+            if (isIncome)
             {
-                var accumulator = GetOrCreateAccumulator(accumulators, link.Tag);
-                if (fixedExpense.Type == TransactionType.Income)
-                {
-                    accumulator.Income += share;
-                }
-                else
-                {
-                    accumulator.Expense += share;
-                }
+                accumulator.Income += amount;
+            }
+            else
+            {
+                accumulator.Expense += amount;
             }
         }
 

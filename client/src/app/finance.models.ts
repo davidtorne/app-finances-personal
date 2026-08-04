@@ -73,6 +73,10 @@ export interface WeeklyForecast {
   weeks: WeeklyForecastWeek[];
 }
 
+export interface ForecastSettings {
+  excludedTagIds: number[];
+}
+
 export interface CreateTransaction {
   type: TransactionType;
   amount: number;
