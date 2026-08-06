@@ -22,7 +22,7 @@ import {
   FinanceSummary,
   FinanceTransaction,
   FixedExpense,
-  ForecastSettings,
+  ForecastCategory,
   TagGroup,
   TransactionTag,
   TransactionType,
@@ -127,12 +127,13 @@ export class App implements OnInit, OnDestroy {
     'Juliol', 'Agost', 'Setembre', 'Octubre', 'Novembre', 'Desembre',
   ];
 
+  protected readonly weekLabels = ['Primera setmana', 'Segona setmana', 'Tercera setmana', 'Últims de mes'];
   protected readonly weeklyForecast = signal<WeeklyForecast | null>(null);
   protected forecastAnchor = this.today();
   protected expandedWeekNumber: number | null = null;
   protected showForecastSettings = false;
-  protected excludedSubtypeIds = new Set<number>();
-  protected readonly savingForecastSettings = signal(false);
+  protected readonly forecastCategories = signal<ForecastCategory[]>([]);
+  protected readonly savingForecastCategoryKey = signal<string | null>(null);
 
   private financialDataSubscription?: Subscription;
 
@@ -206,6 +207,7 @@ export class App implements OnInit, OnDestroy {
     this.loadFixedExpenses();
     this.loadDriveStatus();
     this.loadWeeklyForecast();
+    this.loadForecastCategories();
   }
 
   protected refreshFinancialData(): void {
@@ -289,40 +291,37 @@ export class App implements OnInit, OnDestroy {
   protected toggleForecastSettings(): void {
     this.showForecastSettings = !this.showForecastSettings;
     if (this.showForecastSettings) {
-      this.loadForecastSettings();
+      this.loadForecastCategories();
     }
   }
 
-  protected loadForecastSettings(): void {
-    this.api.getForecastSettings().subscribe({
-      next: (settings) => {
-        this.excludedSubtypeIds = new Set(settings.excludedTagIds);
-      },
-      error: () => this.error.set('No s’ha pogut carregar la configuració de la previsió.'),
+  protected loadForecastCategories(): void {
+    this.api.getForecastCategories().subscribe({
+      next: (categories) => this.forecastCategories.set(categories),
+      error: () => this.error.set('No s’han pogut carregar les categories de la previsió.'),
     });
   }
 
-  protected toggleExcludedSubtype(tagId: number, excluded: boolean): void {
-    if (excluded) {
-      this.excludedSubtypeIds.add(tagId);
-    } else {
-      this.excludedSubtypeIds.delete(tagId);
-    }
+  protected get pendingForecastCategoriesCount(): number {
+    return this.forecastCategories().filter((category) => !category.isConfigured).length;
   }
 
-  protected saveForecastSettings(): void {
-    this.savingForecastSettings.set(true);
+  protected assignForecastCategory(category: ForecastCategory, week: number | null): void {
+    this.savingForecastCategoryKey.set(category.key);
     this.error.set('');
-    this.notice.set('');
     this.api
-      .saveForecastSettings({ excludedTagIds: [...this.excludedSubtypeIds] })
-      .pipe(finalize(() => this.savingForecastSettings.set(false)))
+      .saveForecastCategory({ key: category.key, week })
+      .pipe(finalize(() => this.savingForecastCategoryKey.set(null)))
       .subscribe({
         next: () => {
-          this.notice.set('Configuració de la previsió desada.');
+          this.forecastCategories.update((categories) =>
+            categories.map((item) =>
+              item.key === category.key ? { ...item, week, isConfigured: true } : item,
+            ),
+          );
           this.loadWeeklyForecast();
         },
-        error: () => this.error.set('No s’ha pogut desar la configuració de la previsió.'),
+        error: () => this.error.set('No s’ha pogut desar l’assignació de la categoria.'),
       });
   }
 

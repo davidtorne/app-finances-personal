@@ -88,13 +88,16 @@ public static class DatabaseSchema
             """);
     }
 
-    public static async Task EnsureForecastExcludedTagsTableAsync(FinanceDbContext db)
+    public static async Task EnsureForecastCategoryAssignmentsTableAsync(FinanceDbContext db)
     {
         await db.Database.ExecuteSqlRawAsync("""
-            CREATE TABLE IF NOT EXISTS ForecastExcludedTags (
-                TagId INTEGER NOT NULL CONSTRAINT PK_ForecastExcludedTags PRIMARY KEY,
-                CONSTRAINT FK_ForecastExcludedTags_Tags_TagId FOREIGN KEY (TagId) REFERENCES Tags (Id) ON DELETE CASCADE
+            DROP TABLE IF EXISTS ForecastExcludedTags;
+            CREATE TABLE IF NOT EXISTS ForecastCategoryAssignments (
+                Id INTEGER NOT NULL CONSTRAINT PK_ForecastCategoryAssignments PRIMARY KEY AUTOINCREMENT,
+                CategoryKey TEXT NOT NULL,
+                Week INTEGER NULL
             );
+            CREATE UNIQUE INDEX IF NOT EXISTS IX_ForecastCategoryAssignments_CategoryKey ON ForecastCategoryAssignments (CategoryKey);
             """);
     }
 }

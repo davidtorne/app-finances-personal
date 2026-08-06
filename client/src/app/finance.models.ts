@@ -69,12 +69,21 @@ export interface WeeklyForecast {
   monthTo: string;
   monthIncome: number;
   incomeSource: 'budget' | 'actual';
-  fixedExpensesTotal: number;
   weeks: WeeklyForecastWeek[];
 }
 
-export interface ForecastSettings {
-  excludedTagIds: number[];
+export interface ForecastCategory {
+  key: string;
+  typeName: string;
+  subtypeName: string;
+  averageMonthlyAmount: number;
+  isConfigured: boolean;
+  week: number | null;
+}
+
+export interface SaveForecastCategory {
+  key: string;
+  week: number | null;
 }
 
 export interface CreateTransaction {

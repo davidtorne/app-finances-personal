@@ -162,6 +162,11 @@
       (click)="showSection('weekly-forecast')"
     >
       Previsió setmanal
+      @if (pendingForecastCategoriesCount) {
+        <span class="pending-badge" [attr.aria-label]="pendingForecastCategoriesCount + ' categories per configurar'">
+          {{ pendingForecastCategoriesCount }}
+        </span>
+      }
     </button>
   </nav>
 
@@ -984,7 +989,10 @@
           </button>
         </div>
         <button type="button" class="text-action" (click)="toggleForecastSettings()">
-          {{ showForecastSettings ? 'Tancar' : 'Exclusions' }}
+          {{ showForecastSettings ? 'Tancar' : 'Configurar categories' }}
+          @if (pendingForecastCategoriesCount) {
+            <span class="pending-badge">{{ pendingForecastCategoriesCount }}</span>
+          }
         </button>
       </div>
     </section>
@@ -994,35 +1002,52 @@
         <div class="panel-heading">
           <div>
             <p class="eyebrow">Configuració</p>
-            <h2>Exclou subtipus de l'estimació</h2>
+            <h2>Assigna cada categoria a una setmana</h2>
           </div>
+          <span class="count">{{ forecastCategories().length }} categories</span>
         </div>
         <p class="panel-description">
-          Els subtipus marcats no es tindran en compte en calcular la mitjana històrica per a les setmanes
-          futures. Les setmanes ja passades o l'actual sempre mostren la despesa real, incloent-hi aquests
-          subtipus.
+          Detectades a l'històric de despeses dels últims 6 mesos, agrupades per Tipus i Subtipus. Assigna
+          cada categoria a la setmana on sol passar; si la deixes "Sense assignar" no comptarà a
+          l'estimació de setmanes futures. Les setmanes ja passades o l'actual sempre mostren la despesa
+          real.
         </p>
-        <div class="tag-picker">
-          @for (tag of subtypeGroup?.tags ?? []; track tag.id) {
-            <label class="tag-option" [class.selected]="excludedSubtypeIds.has(tag.id)">
-              <input
-                type="checkbox"
-                [checked]="excludedSubtypeIds.has(tag.id)"
-                (change)="toggleExcludedSubtype(tag.id, $any($event.target).checked)"
-              />
-              <i [style.background]="tag.color"></i>
-              {{ tag.name }}
-            </label>
-          }
-        </div>
-        <button
-          class="secondary-button full-width"
-          type="button"
-          (click)="saveForecastSettings()"
-          [disabled]="savingForecastSettings()"
-        >
-          {{ savingForecastSettings() ? 'Desant...' : 'Desar exclusions' }}
-        </button>
+        @if (forecastCategories().length) {
+          <div class="forecast-category-list">
+            @for (category of forecastCategories(); track category.key) {
+              <article class="forecast-category-row" [class.pending]="!category.isConfigured">
+                <div class="forecast-category-main">
+                  @if (!category.isConfigured) {
+                    <span class="pending-dot" aria-label="Pendent de configurar"></span>
+                  }
+                  <div>
+                    <strong>{{ category.typeName }}</strong>
+                    <span>{{ category.subtypeName }}</span>
+                  </div>
+                </div>
+                <div class="forecast-category-amount">
+                  <span>Mitjana mensual</span>
+                  <b>{{ formatCurrency(category.averageMonthlyAmount) }}</b>
+                </div>
+                <select
+                  [ngModel]="category.week"
+                  (ngModelChange)="assignForecastCategory(category, $event)"
+                  [disabled]="savingForecastCategoryKey() === category.key"
+                  [attr.aria-label]="'Setmana per a ' + category.typeName + ' ' + category.subtypeName"
+                >
+                  <option [ngValue]="null">Sense assignar</option>
+                  @for (label of weekLabels; track $index) {
+                    <option [ngValue]="$index + 1">{{ label }}</option>
+                  }
+                </select>
+              </article>
+            }
+          </div>
+        } @else {
+          <div class="empty-state">
+            <span>Encara no hi ha prou historial de despeses per detectar categories.</span>
+          </div>
+        }
       </section>
     }
 
@@ -1038,13 +1063,6 @@
           </span>
         </div>
 
-        @if (forecast.fixedExpensesTotal) {
-          <p class="panel-description">
-            Inclou {{ formatCurrency(forecast.fixedExpensesTotal) }} de despeses fixes previstes aquest mes,
-            situades a la setmana on s'han pagat altres anys.
-          </p>
-        }
-
         <div class="weekly-forecast-list">
           @for (week of forecast.weeks; track week.weekNumber) {
             <article
@@ -1058,7 +1076,7 @@
                 (click)="toggleWeekDetail(week.weekNumber)"
               >
                 <div class="weekly-forecast-main">
-                  <strong>Setmana {{ week.weekNumber }}</strong>
+                  <strong>{{ weekLabels[week.weekNumber - 1] }}</strong>
                   <span>{{ formatDate(week.from) }} – {{ formatDate(week.to) }}</span>
                 </div>
                 <div class="weekly-forecast-expense">

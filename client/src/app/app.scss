@@ -625,6 +625,78 @@ select:focus {
   font-weight: 700;
 }
 
+.pending-badge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 18px;
+  height: 18px;
+  margin-left: 6px;
+  padding: 0 5px;
+  border-radius: 999px;
+  color: #fff;
+  background: #dc2626;
+  font-size: 0.68rem;
+  font-weight: 800;
+  vertical-align: middle;
+}
+
+.pending-dot {
+  width: 8px;
+  height: 8px;
+  margin-top: 3px;
+  border-radius: 50%;
+  background: #dc2626;
+  flex-shrink: 0;
+}
+
+.forecast-category-list {
+  display: grid;
+  gap: 10px;
+}
+
+.forecast-category-row {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 14px;
+  border: 1px solid #edf1f5;
+  border-radius: 12px;
+}
+
+.forecast-category-row.pending {
+  border-color: #fecaca;
+  background: #fef2f2;
+}
+
+.forecast-category-main {
+  display: flex;
+  gap: 8px;
+  flex: 1;
+}
+
+.forecast-category-main > div {
+  display: grid;
+  gap: 3px;
+}
+
+.forecast-category-main span {
+  color: #94a3b8;
+  font-size: 0.76rem;
+}
+
+.forecast-category-amount {
+  display: grid;
+  gap: 3px;
+  text-align: right;
+}
+
+.forecast-category-amount span {
+  color: #94a3b8;
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+
 .tag-manager-fields {
   display: grid;
 }

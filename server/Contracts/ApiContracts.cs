@@ -70,12 +70,17 @@ public sealed record WeeklyForecastDto(
     DateOnly MonthTo,
     decimal MonthIncome,
     string IncomeSource,
-    decimal FixedExpensesTotal,
     IReadOnlyCollection<WeeklyForecastWeekDto> Weeks);
 
-public sealed record ForecastSettingsDto(IReadOnlyCollection<int> ExcludedTagIds);
+public sealed record ForecastCategoryDto(
+    string Key,
+    string TypeName,
+    string SubtypeName,
+    decimal AverageMonthlyAmount,
+    bool IsConfigured,
+    int? Week);
 
-public sealed record SaveForecastSettingsRequest(IReadOnlyCollection<int> ExcludedTagIds);
+public sealed record SaveForecastCategoryRequest(string Key, int? Week);
 
 public sealed record TagTotalDto(
     int TagId,
