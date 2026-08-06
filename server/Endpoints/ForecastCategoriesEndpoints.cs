@@ -51,9 +51,9 @@ public static class ForecastCategoriesEndpoints
                 return Results.BadRequest("Falta la clau de la categoria.");
             }
 
-            if (request.Week is < 1 or > 4)
+            if (request.Week is null or < 0 or > 4)
             {
-                return Results.BadRequest("La setmana ha d'estar entre 1 i 4.");
+                return Results.BadRequest("La setmana ha d'estar entre 0 (exclosa) i 4.");
             }
 
             var existing = await db.ForecastCategoryAssignments

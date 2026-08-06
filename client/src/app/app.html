@@ -1008,7 +1008,7 @@
         </div>
         <p class="panel-description">
           Detectades a l'històric de despeses dels últims 6 mesos, agrupades per Tipus i Subtipus. Assigna
-          cada categoria a la setmana on sol passar; si la deixes "Sense assignar" no comptarà a
+          cada categoria a la setmana on sol passar, o marca-la com a "Exclosa" perquè no compti a
           l'estimació de setmanes futures. Les setmanes ja passades o l'actual sempre mostren la despesa
           real.
         </p>
@@ -1035,7 +1035,10 @@
                   [disabled]="savingForecastCategoryKey() === category.key"
                   [attr.aria-label]="'Setmana per a ' + category.typeName + ' ' + category.subtypeName"
                 >
-                  <option [ngValue]="null">Sense assignar</option>
+                  @if (!category.isConfigured) {
+                    <option [ngValue]="null" disabled>Pendent</option>
+                  }
+                  <option [ngValue]="0">Exclosa</option>
                   @for (label of weekLabels; track $index) {
                     <option [ngValue]="$index + 1">{{ label }}</option>
                   }
