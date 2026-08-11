@@ -22,7 +22,7 @@ import {
   FinanceSummary,
   FinanceTransaction,
   FixedExpense,
-  ForecastCategory,
+  MonthlyFixedExpense,
   TagGroup,
   TransactionTag,
   TransactionType,
@@ -132,8 +132,16 @@ export class App implements OnInit, OnDestroy {
   protected forecastAnchor = this.today();
   protected expandedWeekNumber: number | null = null;
   protected showForecastSettings = false;
-  protected readonly forecastCategories = signal<ForecastCategory[]>([]);
-  protected readonly savingForecastCategoryKey = signal<string | null>(null);
+  protected readonly savingFixedExpenseForecastId = signal<number | null>(null);
+
+  protected readonly monthlyFixedExpenses = signal<MonthlyFixedExpense[]>([]);
+  protected readonly savingMonthlyFixedExpense = signal(false);
+  protected monthlyFixedExpenseForm = {
+    description: '',
+    amount: null as number | null,
+    week: 1,
+  };
+  protected editingMonthlyFixedExpenseId = 0;
 
   private financialDataSubscription?: Subscription;
 
@@ -207,7 +215,7 @@ export class App implements OnInit, OnDestroy {
     this.loadFixedExpenses();
     this.loadDriveStatus();
     this.loadWeeklyForecast();
-    this.loadForecastCategories();
+    this.loadMonthlyFixedExpenses();
   }
 
   protected refreshFinancialData(): void {
@@ -291,37 +299,114 @@ export class App implements OnInit, OnDestroy {
   protected toggleForecastSettings(): void {
     this.showForecastSettings = !this.showForecastSettings;
     if (this.showForecastSettings) {
-      this.loadForecastCategories();
+      this.loadMonthlyFixedExpenses();
     }
   }
 
-  protected loadForecastCategories(): void {
-    this.api.getForecastCategories().subscribe({
-      next: (categories) => this.forecastCategories.set(categories),
-      error: () => this.error.set('No s’han pogut carregar les categories de la previsió.'),
+  protected loadMonthlyFixedExpenses(): void {
+    this.api.getMonthlyFixedExpenses().subscribe({
+      next: (items) => this.monthlyFixedExpenses.set(items),
+      error: () => this.error.set('No s’han pogut carregar les despeses fixes mensuals.'),
     });
   }
 
-  protected get pendingForecastCategoriesCount(): number {
-    return this.forecastCategories().filter((category) => !category.isConfigured).length;
-  }
+  protected saveMonthlyFixedExpense(): void {
+    if (!this.monthlyFixedExpenseForm.description.trim() || !this.monthlyFixedExpenseForm.amount) {
+      this.error.set('Indica un concepte i un import superior a zero.');
+      return;
+    }
 
-  protected assignForecastCategory(category: ForecastCategory, week: number | null): void {
-    this.savingForecastCategoryKey.set(category.key);
+    this.savingMonthlyFixedExpense.set(true);
     this.error.set('');
-    this.api
-      .saveForecastCategory({ key: category.key, week })
-      .pipe(finalize(() => this.savingForecastCategoryKey.set(null)))
+    const request = {
+      description: this.monthlyFixedExpenseForm.description.trim(),
+      amount: this.monthlyFixedExpenseForm.amount,
+      week: this.monthlyFixedExpenseForm.week,
+    };
+    const operation: Observable<unknown> = this.editingMonthlyFixedExpenseId
+      ? this.api.updateMonthlyFixedExpense(this.editingMonthlyFixedExpenseId, request)
+      : this.api.createMonthlyFixedExpense(request);
+
+    operation.pipe(finalize(() => this.savingMonthlyFixedExpense.set(false)))
       .subscribe({
         next: () => {
-          this.forecastCategories.update((categories) =>
-            categories.map((item) =>
-              item.key === category.key ? { ...item, week, isConfigured: true } : item,
+          this.resetMonthlyFixedExpenseForm();
+          this.loadMonthlyFixedExpenses();
+          this.loadWeeklyForecast();
+        },
+        error: (response) => {
+          this.error.set(
+            typeof response.error === 'string'
+              ? response.error
+              : 'No s’ha pogut desar la despesa fixa mensual.',
+          );
+        },
+      });
+  }
+
+  protected editMonthlyFixedExpense(item: MonthlyFixedExpense): void {
+    this.editingMonthlyFixedExpenseId = item.id;
+    this.monthlyFixedExpenseForm = {
+      description: item.description,
+      amount: item.amount,
+      week: item.week,
+    };
+  }
+
+  protected cancelMonthlyFixedExpenseEdit(): void {
+    this.resetMonthlyFixedExpenseForm();
+  }
+
+  protected deleteMonthlyFixedExpense(id: number): void {
+    this.api.deleteMonthlyFixedExpense(id).subscribe({
+      next: () => {
+        if (this.editingMonthlyFixedExpenseId === id) {
+          this.resetMonthlyFixedExpenseForm();
+        }
+        this.loadMonthlyFixedExpenses();
+        this.loadWeeklyForecast();
+      },
+      error: () => this.error.set('No s’ha pogut eliminar la despesa fixa mensual.'),
+    });
+  }
+
+  private resetMonthlyFixedExpenseForm(): void {
+    this.editingMonthlyFixedExpenseId = 0;
+    this.monthlyFixedExpenseForm = {
+      description: '',
+      amount: null,
+      week: 1,
+    };
+  }
+
+  protected get forecastAnchorMonth(): number {
+    return new Date(`${this.forecastAnchor}T12:00:00`).getMonth() + 1;
+  }
+
+  protected get fixedExpensesForForecastMonth(): FixedExpense[] {
+    return this.fixedExpenses().filter((item) => item.month === this.forecastAnchorMonth);
+  }
+
+  protected get pendingFixedExpenseForecastCount(): number {
+    return this.fixedExpensesForForecastMonth.filter((item) => item.forecastWeek === null).length;
+  }
+
+  protected assignFixedExpenseForecastWeek(fixedExpense: FixedExpense, week: number | null): void {
+    this.savingFixedExpenseForecastId.set(fixedExpense.id);
+    this.error.set('');
+    this.api
+      .saveFixedExpenseForecastWeek(fixedExpense.id, { week })
+      .pipe(finalize(() => this.savingFixedExpenseForecastId.set(null)))
+      .subscribe({
+        next: () => {
+          this.fixedExpenses.update((items) =>
+            items.map((item) =>
+              item.id === fixedExpense.id ? { ...item, forecastWeek: week } : item,
             ),
           );
           this.loadWeeklyForecast();
         },
-        error: () => this.error.set('No s’ha pogut desar l’assignació de la categoria.'),
+        error: () => this.error.set('No s’ha pogut desar l’assignació de la despesa fixa.'),
       });
   }
 
@@ -341,6 +426,8 @@ export class App implements OnInit, OnDestroy {
       this.loadFixedExpenses();
     } else if (section === 'weekly-forecast') {
       this.loadWeeklyForecast();
+      this.loadFixedExpenses();
+      this.loadMonthlyFixedExpenses();
     }
   }
 

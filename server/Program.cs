@@ -37,7 +37,7 @@ using (var scope = app.Services.CreateScope())
     await DatabaseSchema.EnsureBudgetTablesAsync(db);
     await DatabaseSchema.EnsureFixedExpenseTablesAsync(db);
     await DatabaseSchema.EnsureDriveSettingsTableAsync(db);
-    await DatabaseSchema.EnsureForecastCategoryAssignmentsTableAsync(db);
+    await DatabaseSchema.EnsureMonthlyFixedExpenseTablesAsync(db);
     await DatabaseSeeder.SeedAsync(db);
 }
 
@@ -46,7 +46,7 @@ app.MapTagEndpoints();
 app.MapTransactionEndpoints();
 app.MapSummaryEndpoints();
 app.MapWeeklyForecastEndpoints();
-app.MapForecastCategoriesEndpoints();
+app.MapMonthlyFixedExpenseEndpoints();
 app.MapBudgetEndpoints();
 app.MapFixedExpenseEndpoints();
 app.MapBackupEndpoints();

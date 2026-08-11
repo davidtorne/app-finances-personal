@@ -112,6 +112,27 @@ public static class FixedExpenseEndpoints
             return Results.NoContent();
         });
 
+        group.MapPut("/{id:int}/forecast-week", async (
+            int id,
+            SaveFixedExpenseForecastWeekRequest request,
+            FinanceDbContext db) =>
+        {
+            if (request.Week is null or < 0 or > 4)
+            {
+                return Results.BadRequest("La setmana ha d'estar entre 0 (exclosa) i 4.");
+            }
+
+            var fixedExpense = await db.FixedExpenses.FindAsync(id);
+            if (fixedExpense is null)
+            {
+                return Results.NotFound("La despesa fixa no existeix.");
+            }
+
+            fixedExpense.ForecastWeek = request.Week;
+            await db.SaveChangesAsync();
+            return Results.NoContent();
+        });
+
         return app;
     }
 
@@ -152,6 +173,7 @@ public static class FixedExpenseEndpoints
             item.Description,
             item.Amount,
             item.Month,
+            item.ForecastWeek,
             item.FixedExpenseTags
                 .OrderBy(link => link.Tag.TagGroup.Name)
                 .ThenBy(link => link.Tag.Name)

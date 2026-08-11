@@ -2,14 +2,11 @@ using Microsoft.EntityFrameworkCore;
 using PersonalFinances.Api.Contracts;
 using PersonalFinances.Api.Data;
 using PersonalFinances.Api.Models;
-using PersonalFinances.Api.Services;
 
 namespace PersonalFinances.Api.Endpoints;
 
 public static class WeeklyForecastEndpoints
 {
-    private const int HistoryMonths = 6;
-
     // (start day, end day of the month bucket; 0 means "until the end of the month")
     private static readonly (int Start, int End)[] WeekDayRanges =
     [
@@ -30,34 +27,43 @@ public static class WeeklyForecastEndpoints
 
             var (monthIncome, incomeSource) = await GetMonthIncomeAsync(db, monthStart, monthEnd);
 
-            // Income for future weeks is still estimated from the historical day-of-month pattern.
-            var historyStart = monthStart.AddMonths(-HistoryMonths);
-            var historicalIncomeTransactions = await db.Transactions
-                .AsNoTracking()
-                .Include(item => item.TransactionTags)
-                .ThenInclude(link => link.Tag)
-                .ThenInclude(tag => tag.TagGroup)
-                .Where(item => item.Type == TransactionType.Income && item.Date >= historyStart && item.Date < monthStart)
-                .ToListAsync();
-
-            // Expenses for future weeks come from the categories the user has manually assigned to a week.
-            var detectedCategories = await ForecastCategoryCalculator.DetectCategoriesAsync(db, monthStart);
-            var assignments = await db.ForecastCategoryAssignments
-                .AsNoTracking()
-                .Where(item => item.Week != null)
-                .ToDictionaryAsync(item => item.CategoryKey, item => item.Week!.Value);
-
-            var categoriesByWeek = new List<ForecastCategoryCalculator.CategoryInfo>[WeekDayRanges.Length];
-            for (var i = 0; i < categoriesByWeek.Length; i++)
+            // Expenses for future weeks come from the monthly fixed expenses the user manually entered and
+            // assigned to a week.
+            var monthlyFixedExpenses = await db.MonthlyFixedExpenses.AsNoTracking().ToListAsync();
+            var monthlyFixedExpensesByWeek = new List<MonthlyFixedExpense>[WeekDayRanges.Length];
+            for (var i = 0; i < monthlyFixedExpensesByWeek.Length; i++)
             {
-                categoriesByWeek[i] = [];
+                monthlyFixedExpensesByWeek[i] = [];
             }
 
-            foreach (var category in detectedCategories)
+            foreach (var monthlyFixedExpense in monthlyFixedExpenses)
             {
-                if (assignments.TryGetValue(category.Key, out var week) && week is >= 1 && week <= WeekDayRanges.Length)
+                if (monthlyFixedExpense.Week >= 1 && monthlyFixedExpense.Week <= WeekDayRanges.Length)
                 {
-                    categoriesByWeek[week - 1].Add(category);
+                    monthlyFixedExpensesByWeek[monthlyFixedExpense.Week - 1].Add(monthlyFixedExpense);
+                }
+            }
+
+            // Fixed expenses introduced for the viewed month, placed in the week the user manually assigned them to.
+            var monthFixedExpenses = await db.FixedExpenses
+                .AsNoTracking()
+                .Include(item => item.FixedExpenseTags)
+                .ThenInclude(link => link.Tag)
+                .ThenInclude(tag => tag.TagGroup)
+                .Where(item => item.Month == anchorDate.Month)
+                .ToListAsync();
+
+            var fixedExpensesByWeek = new List<FixedExpense>[WeekDayRanges.Length];
+            for (var i = 0; i < fixedExpensesByWeek.Length; i++)
+            {
+                fixedExpensesByWeek[i] = [];
+            }
+
+            foreach (var fixedExpense in monthFixedExpenses)
+            {
+                if (fixedExpense.ForecastWeek is { } week && week >= 1 && week <= WeekDayRanges.Length)
+                {
+                    fixedExpensesByWeek[week - 1].Add(fixedExpense);
                 }
             }
 
@@ -72,15 +78,20 @@ public static class WeeklyForecastEndpoints
                 var isCurrent = today >= weekFrom && today <= weekTo;
                 var isEstimate = weekFrom > today;
 
-                decimal weekIncome;
-                decimal weekExpense;
+                // The forecast (previst) numbers are always computed from the manually assigned monthly
+                // fixed expenses and fixed expenses, regardless of whether the week is past, current or
+                // future, so the user can compare what was planned against what actually happened.
+                var forecastIncome = fixedExpensesByWeek[i].Where(item => item.Type == TransactionType.Income).Sum(item => item.Amount);
+                var forecastExpense = monthlyFixedExpensesByWeek[i].Sum(item => item.Amount)
+                    + fixedExpensesByWeek[i].Where(item => item.Type == TransactionType.Expense).Sum(item => item.Amount);
+
+                decimal actualIncome = 0;
+                decimal actualExpense = 0;
                 IReadOnlyCollection<TagTotalDto> tagTotals;
 
                 if (isEstimate)
                 {
-                    weekIncome = GetHistoricalIncomeAverage(historicalIncomeTransactions, monthStart, startDay, endDay);
-                    weekExpense = categoriesByWeek[i].Sum(item => item.AverageMonthlyAmount);
-                    tagTotals = BuildEstimatedTagTotals(historicalIncomeTransactions, monthStart, startDay, endDay, categoriesByWeek[i]);
+                    tagTotals = BuildEstimatedTagTotals(fixedExpensesByWeek[i]);
                 }
                 else
                 {
@@ -92,12 +103,14 @@ public static class WeeklyForecastEndpoints
                         .Where(item => item.Date >= weekFrom && item.Date <= weekTo)
                         .ToListAsync();
 
-                    weekIncome = actualTransactions.Where(item => item.Type == TransactionType.Income).Sum(item => item.Amount);
-                    weekExpense = actualTransactions.Where(item => item.Type == TransactionType.Expense).Sum(item => item.Amount);
+                    actualIncome = actualTransactions.Where(item => item.Type == TransactionType.Income).Sum(item => item.Amount);
+                    actualExpense = actualTransactions.Where(item => item.Type == TransactionType.Expense).Sum(item => item.Amount);
                     tagTotals = BuildActualTagTotals(actualTransactions);
                 }
 
-                cumulativeExpense += weekExpense;
+                // The running balance still blends forecast for future weeks with actuals for past/current
+                // weeks, same as before.
+                cumulativeExpense += isEstimate ? forecastExpense : actualExpense;
 
                 weeks.Add(new WeeklyForecastWeekDto(
                     i + 1,
@@ -105,17 +118,29 @@ public static class WeeklyForecastEndpoints
                     weekTo,
                     isCurrent,
                     isEstimate,
-                    weekIncome,
-                    weekExpense,
+                    forecastIncome,
+                    forecastExpense,
+                    actualIncome,
+                    actualExpense,
                     monthIncome - cumulativeExpense,
                     tagTotals));
             }
+
+            // What's left of the month's income once the full month's cost is covered (actuals for
+            // past/current weeks, forecast for future ones — cumulativeExpense already totals that across
+            // every week), spread evenly across the weeks that aren't fully over yet (current week included).
+            var remainingWeeksCount = weeks.Count(item => item.IsCurrent || item.IsEstimate);
+            var remainingWeeklyBudget = remainingWeeksCount > 0
+                ? (monthIncome - cumulativeExpense) / remainingWeeksCount
+                : 0;
 
             return Results.Ok(new WeeklyForecastDto(
                 monthStart,
                 monthEnd,
                 monthIncome,
                 incomeSource,
+                remainingWeeklyBudget,
+                remainingWeeksCount,
                 weeks));
         });
 
@@ -130,83 +155,60 @@ public static class WeeklyForecastEndpoints
         var budget = await db.Budgets
             .AsNoTracking()
             .Include(item => item.Items)
+            .ThenInclude(item => item.BudgetItemTags)
             .Where(item => item.From == monthStart && item.To == monthEnd)
             .OrderByDescending(item => item.Id)
             .FirstOrDefaultAsync();
+
+        var monthIncomeTransactions = await db.Transactions
+            .AsNoTracking()
+            .Include(item => item.TransactionTags)
+            .Where(item => item.Type == TransactionType.Income && item.Date >= monthStart && item.Date <= monthEnd)
+            .ToListAsync();
 
         if (budget is not null)
         {
             var expectedIncome = budget.Items
                 .Where(item => item.Type == TransactionType.Income)
                 .Sum(item => item.ExpectedAmount);
-            return (expectedIncome, "budget");
+
+            // Income that doesn't match any tag used by the budget's income items wasn't part of the
+            // plan (e.g. an unexpected refund or one-off job), so it's added on top of what was budgeted
+            // instead of being silently dropped from the month's total.
+            var budgetedIncomeTagIds = budget.Items
+                .Where(item => item.Type == TransactionType.Income)
+                .SelectMany(item => item.BudgetItemTags.Select(link => link.TagId))
+                .ToHashSet();
+
+            var unbudgetedIncome = monthIncomeTransactions
+                .Where(transaction => !transaction.TransactionTags.Any(link => budgetedIncomeTagIds.Contains(link.TagId)))
+                .Sum(transaction => transaction.Amount);
+
+            return (expectedIncome + unbudgetedIncome, "budget");
         }
 
-        var actualIncome = await db.Transactions
-            .Where(item => item.Type == TransactionType.Income && item.Date >= monthStart && item.Date <= monthEnd)
-            .SumAsync(item => item.Amount);
+        var actualIncome = monthIncomeTransactions.Sum(item => item.Amount);
         return (actualIncome, "actual");
     }
 
-    private static (DateOnly From, DateOnly To) GetHistoricalRange(DateOnly monthStart, int monthsAgo, int startDay, int endDay)
-    {
-        var historicalMonth = monthStart.AddMonths(-monthsAgo);
-        var from = new DateOnly(historicalMonth.Year, historicalMonth.Month, startDay);
-        var to = endDay == 0
-            ? historicalMonth.AddMonths(1).AddDays(-1)
-            : new DateOnly(historicalMonth.Year, historicalMonth.Month, endDay);
-        return (from, to);
-    }
-
-    private static decimal GetHistoricalIncomeAverage(
-        IReadOnlyCollection<FinanceTransaction> historicalIncomeTransactions,
-        DateOnly monthStart,
-        int startDay,
-        int endDay)
-    {
-        var totals = new List<decimal>();
-        for (var monthsAgo = 1; monthsAgo <= HistoryMonths; monthsAgo++)
-        {
-            var (histFrom, histTo) = GetHistoricalRange(monthStart, monthsAgo, startDay, endDay);
-            var sum = historicalIncomeTransactions
-                .Where(item => item.Date >= histFrom && item.Date <= histTo)
-                .Sum(item => item.Amount);
-            totals.Add(sum);
-        }
-
-        return totals.Count > 0 ? totals.Average() : 0;
-    }
-
     private static IReadOnlyCollection<TagTotalDto> BuildEstimatedTagTotals(
-        IReadOnlyCollection<FinanceTransaction> historicalIncomeTransactions,
-        DateOnly monthStart,
-        int startDay,
-        int endDay,
-        IReadOnlyCollection<ForecastCategoryCalculator.CategoryInfo> weekCategories)
+        IReadOnlyCollection<FixedExpense> weekFixedExpenses)
     {
         var accumulators = new Dictionary<int, TagAccumulator>();
 
-        for (var monthsAgo = 1; monthsAgo <= HistoryMonths; monthsAgo++)
+        foreach (var fixedExpense in weekFixedExpenses)
         {
-            var (histFrom, histTo) = GetHistoricalRange(monthStart, monthsAgo, startDay, endDay);
-            var matching = historicalIncomeTransactions.Where(item => item.Date >= histFrom && item.Date <= histTo);
-
-            foreach (var transaction in matching)
+            foreach (var link in fixedExpense.FixedExpenseTags)
             {
-                foreach (var link in transaction.TransactionTags)
+                var accumulator = GetOrCreateAccumulator(accumulators, link.Tag);
+                if (fixedExpense.Type == TransactionType.Income)
                 {
-                    var accumulator = GetOrCreateAccumulator(accumulators, link.Tag);
-                    accumulator.Income += transaction.Amount / HistoryMonths;
+                    accumulator.Income += fixedExpense.Amount;
                 }
-            }
-        }
-
-        foreach (var category in weekCategories)
-        {
-            foreach (var tag in category.TypeTags.Concat(category.SubtypeTags))
-            {
-                var accumulator = GetOrCreateAccumulator(accumulators, tag);
-                accumulator.Expense += category.AverageMonthlyAmount;
+                else
+                {
+                    accumulator.Expense += fixedExpense.Amount;
+                }
             }
         }
 

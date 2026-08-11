@@ -91,6 +91,7 @@ public sealed class FixedExpense
     public string Description { get; set; } = string.Empty;
     public decimal Amount { get; set; }
     public int Month { get; set; }
+    public int? ForecastWeek { get; set; }
     public DateTime CreatedAtUtc { get; set; } = DateTime.UtcNow;
     public ICollection<FixedExpenseTag> FixedExpenseTags { get; set; } = [];
 }
@@ -114,9 +115,11 @@ public sealed class DriveSettings
     public bool AutoUpload { get; set; } = true;
 }
 
-public sealed class ForecastCategoryAssignment
+public sealed class MonthlyFixedExpense
 {
     public int Id { get; set; }
-    public string CategoryKey { get; set; } = string.Empty;
-    public int? Week { get; set; }
+    public string Description { get; set; } = string.Empty;
+    public decimal Amount { get; set; }
+    public int Week { get; set; }
+    public DateTime CreatedAtUtc { get; set; } = DateTime.UtcNow;
 }

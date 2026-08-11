@@ -162,9 +162,9 @@
       (click)="showSection('weekly-forecast')"
     >
       Previsió setmanal
-      @if (pendingForecastCategoriesCount) {
-        <span class="pending-badge" [attr.aria-label]="pendingForecastCategoriesCount + ' categories per configurar'">
-          {{ pendingForecastCategoriesCount }}
+      @if (pendingFixedExpenseForecastCount) {
+        <span class="pending-badge" [attr.aria-label]="pendingFixedExpenseForecastCount + ' despeses fixes per configurar'">
+          {{ pendingFixedExpenseForecastCount }}
         </span>
       }
     </button>
@@ -989,9 +989,9 @@
           </button>
         </div>
         <button type="button" class="text-action" (click)="toggleForecastSettings()">
-          {{ showForecastSettings ? 'Tancar' : 'Configurar categories' }}
-          @if (pendingForecastCategoriesCount) {
-            <span class="pending-badge">{{ pendingForecastCategoriesCount }}</span>
+          {{ showForecastSettings ? 'Tancar' : 'Configurar previsió' }}
+          @if (pendingFixedExpenseForecastCount) {
+            <span class="pending-badge">{{ pendingFixedExpenseForecastCount }}</span>
           }
         </button>
       </div>
@@ -1002,40 +1002,130 @@
         <div class="panel-heading">
           <div>
             <p class="eyebrow">Configuració</p>
-            <h2>Assigna cada categoria a una setmana</h2>
+            <h2>{{ editingMonthlyFixedExpenseId ? 'Editar despesa fixa mensual' : 'Afegir despesa fixa mensual' }}</h2>
           </div>
-          <span class="count">{{ forecastCategories().length }} categories</span>
+          @if (editingMonthlyFixedExpenseId) {
+            <button type="button" class="text-action" (click)="cancelMonthlyFixedExpenseEdit()">Cancel·lar edició</button>
+          }
         </div>
         <p class="panel-description">
-          Detectades a l'històric de despeses dels últims 6 mesos, agrupades per Tipus i Subtipus. Assigna
-          cada categoria a la setmana on sol passar, o marca-la com a "Exclosa" perquè no compti a
-          l'estimació de setmanes futures. Les setmanes ja passades o l'actual sempre mostren la despesa
-          real.
+          Despeses que es repeteixen cada mes. Indica el concepte, l'import i la setmana en què sol
+          carregar-se: s'aplicarà a totes les setmanes futures de cada mes fins que l'elimin's.
         </p>
-        @if (forecastCategories().length) {
+
+        <form (ngSubmit)="saveMonthlyFixedExpense()">
+          <label class="field">
+            <span>Concepte</span>
+            <input
+              name="monthly-fixed-expense-description"
+              [(ngModel)]="monthlyFixedExpenseForm.description"
+              placeholder="Ex. Lloguer"
+              maxlength="240"
+              required
+            />
+          </label>
+
+          <div class="field-row">
+            <label class="field">
+              <span>Import</span>
+              <div class="amount-input">
+                <input
+                  type="number"
+                  name="monthly-fixed-expense-amount"
+                  [(ngModel)]="monthlyFixedExpenseForm.amount"
+                  min="0.01"
+                  step="0.01"
+                  placeholder="0,00"
+                  required
+                />
+                <b>€</b>
+              </div>
+            </label>
+            <label class="field">
+              <span>Setmana</span>
+              <select name="monthly-fixed-expense-week" [(ngModel)]="monthlyFixedExpenseForm.week">
+                @for (label of weekLabels; track $index) {
+                  <option [ngValue]="$index + 1">{{ label }}</option>
+                }
+              </select>
+            </label>
+          </div>
+
+          <button class="primary-button" type="submit" [disabled]="savingMonthlyFixedExpense()">
+            {{
+              savingMonthlyFixedExpense()
+                ? 'Guardant...'
+                : (editingMonthlyFixedExpenseId ? 'Guardar canvis' : 'Afegir despesa fixa mensual')
+            }}
+          </button>
+        </form>
+
+        @if (monthlyFixedExpenses().length) {
+          <div class="budget-item-list">
+            @for (item of monthlyFixedExpenses(); track item.id) {
+              <article class="movement-row">
+                <div class="movement-icon">-</div>
+                <div class="movement-main">
+                  <strong>{{ item.description }}</strong>
+                  <span>{{ weekLabels[item.week - 1] }}</span>
+                </div>
+                <strong class="movement-amount negative">-{{ formatCurrency(item.amount) }}</strong>
+                <button type="button" class="edit-button" (click)="editMonthlyFixedExpense(item)">Editar</button>
+                <button
+                  type="button"
+                  class="delete-button"
+                  (click)="deleteMonthlyFixedExpense(item.id)"
+                  aria-label="Eliminar despesa fixa mensual"
+                >
+                  ×
+                </button>
+              </article>
+            }
+          </div>
+        } @else {
+          <div class="empty-state">
+            <span>Encara no hi ha despeses fixes mensuals.</span>
+          </div>
+        }
+      </section>
+
+      <section class="panel">
+        <div class="panel-heading">
+          <div>
+            <p class="eyebrow">Configuració</p>
+            <h2>Assigna cada despesa fixa a una setmana</h2>
+          </div>
+          <span class="count">{{ fixedExpensesForForecastMonth.length }} despeses fixes</span>
+        </div>
+        <p class="panel-description">
+          Despeses fixes introduïdes per al mes de {{ monthNames[forecastAnchorMonth - 1] }}. Assigna cada
+          una a la setmana on sol passar, o marca-la com a "Exclosa" perquè no compti a l'estimació de
+          setmanes futures. Les setmanes ja passades o l'actual sempre mostren la despesa real.
+        </p>
+        @if (fixedExpensesForForecastMonth.length) {
           <div class="forecast-category-list">
-            @for (category of forecastCategories(); track category.key) {
-              <article class="forecast-category-row" [class.pending]="!category.isConfigured">
+            @for (fixedExpense of fixedExpensesForForecastMonth; track fixedExpense.id) {
+              <article class="forecast-category-row" [class.pending]="fixedExpense.forecastWeek === null">
                 <div class="forecast-category-main">
-                  @if (!category.isConfigured) {
+                  @if (fixedExpense.forecastWeek === null) {
                     <span class="pending-dot" aria-label="Pendent de configurar"></span>
                   }
                   <div>
-                    <strong>{{ category.typeName }}</strong>
-                    <span>{{ category.subtypeName }}</span>
+                    <strong>{{ fixedExpense.description }}</strong>
+                    <span>{{ fixedExpense.type === 'income' ? 'Ingrés' : 'Despesa' }}</span>
                   </div>
                 </div>
                 <div class="forecast-category-amount">
-                  <span>Mitjana mensual</span>
-                  <b>{{ formatCurrency(category.averageMonthlyAmount) }}</b>
+                  <span>Import</span>
+                  <b>{{ formatCurrency(fixedExpense.amount) }}</b>
                 </div>
                 <select
-                  [ngModel]="category.week"
-                  (ngModelChange)="assignForecastCategory(category, $event)"
-                  [disabled]="savingForecastCategoryKey() === category.key"
-                  [attr.aria-label]="'Setmana per a ' + category.typeName + ' ' + category.subtypeName"
+                  [ngModel]="fixedExpense.forecastWeek"
+                  (ngModelChange)="assignFixedExpenseForecastWeek(fixedExpense, $event)"
+                  [disabled]="savingFixedExpenseForecastId() === fixedExpense.id"
+                  [attr.aria-label]="'Setmana per a ' + fixedExpense.description"
                 >
-                  @if (!category.isConfigured) {
+                  @if (fixedExpense.forecastWeek === null) {
                     <option [ngValue]="null" disabled>Pendent</option>
                   }
                   <option [ngValue]="0">Exclosa</option>
@@ -1048,13 +1138,34 @@
           </div>
         } @else {
           <div class="empty-state">
-            <span>Encara no hi ha prou historial de despeses per detectar categories.</span>
+            <span>No hi ha despeses fixes introduïdes per a aquest mes.</span>
           </div>
         }
       </section>
     }
 
     @if (weeklyForecast(); as forecast) {
+      <section class="summary-grid weekly-forecast-summary" aria-label="Disponible per setmana">
+        <article class="summary-card">
+          <span>Disponible per setmana restant</span>
+          <strong
+            [class.positive]="forecast.remainingWeeklyBudget >= 0"
+            [class.negative]="forecast.remainingWeeklyBudget < 0"
+          >
+            {{ formatCurrency(forecast.remainingWeeklyBudget) }}
+          </strong>
+          <small>
+            @if (forecast.remainingWeeksCount) {
+              Ingressos del mes menys el cost total de totes les setmanes, repartit entre
+              {{ forecast.remainingWeeksCount }}
+              {{ forecast.remainingWeeksCount === 1 ? 'setmana restant' : 'setmanes restants' }}
+            } @else {
+              No queden setmanes en aquest mes.
+            }
+          </small>
+        </article>
+      </section>
+
       <section class="panel weekly-forecast">
         <div class="panel-heading">
           <div>
@@ -1083,8 +1194,12 @@
                   <span>{{ formatDate(week.from) }} – {{ formatDate(week.to) }}</span>
                 </div>
                 <div class="weekly-forecast-expense">
-                  <span>{{ week.isEstimate ? 'Despesa estimada' : 'Despesa real' }}</span>
-                  <b>{{ formatCurrency(week.expectedExpense) }}</b>
+                  <span>Total previst</span>
+                  <b>{{ formatCurrency(week.forecastExpense) }}</b>
+                </div>
+                <div class="weekly-forecast-expense">
+                  <span>Total real</span>
+                  <b>{{ formatCurrency(week.actualExpense) }}</b>
                 </div>
                 <div class="weekly-forecast-remaining">
                   <span>Et queda</span>
@@ -1101,12 +1216,20 @@
                 <div class="weekly-forecast-detail">
                   <div class="weekly-forecast-detail-summary">
                     <div>
-                      <span>{{ week.isEstimate ? 'Ingressos estimats' : 'Ingressos reals' }}</span>
-                      <strong class="positive">{{ formatCurrency(week.expectedIncome) }}</strong>
+                      <span>Ingressos previstos</span>
+                      <strong class="positive">{{ formatCurrency(week.forecastIncome) }}</strong>
                     </div>
                     <div>
-                      <span>{{ week.isEstimate ? 'Despeses estimades' : 'Despeses reals' }}</span>
-                      <strong class="negative">{{ formatCurrency(week.expectedExpense) }}</strong>
+                      <span>Despeses previstes</span>
+                      <strong class="negative">{{ formatCurrency(week.forecastExpense) }}</strong>
+                    </div>
+                    <div>
+                      <span>Ingressos reals</span>
+                      <strong class="positive">{{ formatCurrency(week.actualIncome) }}</strong>
+                    </div>
+                    <div>
+                      <span>Despeses reals</span>
+                      <strong class="negative">{{ formatCurrency(week.actualExpense) }}</strong>
                     </div>
                   </div>
 

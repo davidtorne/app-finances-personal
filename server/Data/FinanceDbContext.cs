@@ -16,7 +16,7 @@ public sealed class FinanceDbContext(DbContextOptions<FinanceDbContext> options)
     public DbSet<FixedExpense> FixedExpenses => Set<FixedExpense>();
     public DbSet<FixedExpenseTag> FixedExpenseTags => Set<FixedExpenseTag>();
     public DbSet<DriveSettings> DriveSettings => Set<DriveSettings>();
-    public DbSet<ForecastCategoryAssignment> ForecastCategoryAssignments => Set<ForecastCategoryAssignment>();
+    public DbSet<MonthlyFixedExpense> MonthlyFixedExpenses => Set<MonthlyFixedExpense>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -112,10 +112,10 @@ public sealed class FinanceDbContext(DbContextOptions<FinanceDbContext> options)
             entity.Property(item => item.FolderId).HasMaxLength(120);
         });
 
-        modelBuilder.Entity<ForecastCategoryAssignment>(entity =>
+        modelBuilder.Entity<MonthlyFixedExpense>(entity =>
         {
-            entity.Property(item => item.CategoryKey).HasMaxLength(240);
-            entity.HasIndex(item => item.CategoryKey).IsUnique();
+            entity.Property(item => item.Description).HasMaxLength(240);
+            entity.Property(item => item.Amount).HasPrecision(18, 2);
         });
     }
 }

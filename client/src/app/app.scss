@@ -229,6 +229,10 @@ select:focus {
   margin-bottom: 16px;
 }
 
+.weekly-forecast-summary {
+  grid-template-columns: 1fr;
+}
+
 .section-tabs {
   display: flex;
   gap: 8px;

@@ -58,8 +58,10 @@ export interface WeeklyForecastWeek {
   to: string;
   isCurrent: boolean;
   isEstimate: boolean;
-  expectedIncome: number;
-  expectedExpense: number;
+  forecastIncome: number;
+  forecastExpense: number;
+  actualIncome: number;
+  actualExpense: number;
   remainingBalance: number;
   tagTotals: TagTotal[];
 }
@@ -69,21 +71,22 @@ export interface WeeklyForecast {
   monthTo: string;
   monthIncome: number;
   incomeSource: 'budget' | 'actual';
+  remainingWeeklyBudget: number;
+  remainingWeeksCount: number;
   weeks: WeeklyForecastWeek[];
 }
 
-export interface ForecastCategory {
-  key: string;
-  typeName: string;
-  subtypeName: string;
-  averageMonthlyAmount: number;
-  isConfigured: boolean;
-  week: number | null;
+export interface MonthlyFixedExpense {
+  id: number;
+  description: string;
+  amount: number;
+  week: number;
 }
 
-export interface SaveForecastCategory {
-  key: string;
-  week: number | null;
+export interface CreateMonthlyFixedExpense {
+  description: string;
+  amount: number;
+  week: number;
 }
 
 export interface CreateTransaction {
@@ -151,6 +154,7 @@ export interface FixedExpense {
   description: string;
   amount: number;
   month: number;
+  forecastWeek: number | null;
   tags: TransactionTag[];
 }
 
@@ -160,6 +164,10 @@ export interface CreateFixedExpense {
   amount: number;
   month: number;
   tagIds: number[];
+}
+
+export interface SaveFixedExpenseForecastWeek {
+  week: number | null;
 }
 
 export interface BackupResult {

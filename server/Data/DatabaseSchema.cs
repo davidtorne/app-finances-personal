@@ -71,6 +71,22 @@ public static class DatabaseSchema
             );
             CREATE INDEX IF NOT EXISTS IX_FixedExpenseTags_TagId ON FixedExpenseTags (TagId);
             """);
+
+        var connection = db.Database.GetDbConnection();
+        if (connection.State != ConnectionState.Open)
+        {
+            await connection.OpenAsync();
+        }
+
+        await using var checkColumn = connection.CreateCommand();
+        checkColumn.CommandText = "SELECT COUNT(*) FROM pragma_table_info('FixedExpenses') WHERE name = 'ForecastWeek';";
+        var hasForecastWeekColumn = Convert.ToInt32(await checkColumn.ExecuteScalarAsync()) > 0;
+        if (!hasForecastWeekColumn)
+        {
+            await using var addColumn = connection.CreateCommand();
+            addColumn.CommandText = "ALTER TABLE FixedExpenses ADD COLUMN ForecastWeek INTEGER NULL;";
+            await addColumn.ExecuteNonQueryAsync();
+        }
     }
 
     public static async Task EnsureDriveSettingsTableAsync(FinanceDbContext db)
@@ -88,16 +104,18 @@ public static class DatabaseSchema
             """);
     }
 
-    public static async Task EnsureForecastCategoryAssignmentsTableAsync(FinanceDbContext db)
+    public static async Task EnsureMonthlyFixedExpenseTablesAsync(FinanceDbContext db)
     {
         await db.Database.ExecuteSqlRawAsync("""
             DROP TABLE IF EXISTS ForecastExcludedTags;
-            CREATE TABLE IF NOT EXISTS ForecastCategoryAssignments (
-                Id INTEGER NOT NULL CONSTRAINT PK_ForecastCategoryAssignments PRIMARY KEY AUTOINCREMENT,
-                CategoryKey TEXT NOT NULL,
-                Week INTEGER NULL
+            DROP TABLE IF EXISTS ForecastCategoryAssignments;
+            CREATE TABLE IF NOT EXISTS MonthlyFixedExpenses (
+                Id INTEGER NOT NULL CONSTRAINT PK_MonthlyFixedExpenses PRIMARY KEY AUTOINCREMENT,
+                Description TEXT NOT NULL,
+                Amount TEXT NOT NULL,
+                Week INTEGER NOT NULL,
+                CreatedAtUtc TEXT NOT NULL
             );
-            CREATE UNIQUE INDEX IF NOT EXISTS IX_ForecastCategoryAssignments_CategoryKey ON ForecastCategoryAssignments (CategoryKey);
             """);
     }
 }

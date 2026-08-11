@@ -6,15 +6,16 @@ import {
   CreateBudget,
   CreateBudgetItem,
   CreateFixedExpense,
+  CreateMonthlyFixedExpense,
   CreateTag,
   CreateTransaction,
   DriveStatus,
   FinanceSummary,
   FinanceTransaction,
   FixedExpense,
-  ForecastCategory,
+  MonthlyFixedExpense,
   SaveDriveSettings,
-  SaveForecastCategory,
+  SaveFixedExpenseForecastWeek,
   SummaryPeriod,
   TagGroup,
   WeeklyForecast,
@@ -86,12 +87,26 @@ export class FinanceApiService {
     return this.http.get<WeeklyForecast>(`${this.baseUrl}/weekly-forecast`, { params });
   }
 
-  getForecastCategories() {
-    return this.http.get<ForecastCategory[]>(`${this.baseUrl}/forecast-categories/`);
+  getMonthlyFixedExpenses() {
+    return this.http.get<MonthlyFixedExpense[]>(`${this.baseUrl}/monthly-fixed-expenses/`);
   }
 
-  saveForecastCategory(category: SaveForecastCategory) {
-    return this.http.post<void>(`${this.baseUrl}/forecast-categories/`, category);
+  createMonthlyFixedExpense(monthlyFixedExpense: CreateMonthlyFixedExpense) {
+    return this.http.post<{ id: number }>(
+      `${this.baseUrl}/monthly-fixed-expenses/`,
+      monthlyFixedExpense,
+    );
+  }
+
+  updateMonthlyFixedExpense(id: number, monthlyFixedExpense: CreateMonthlyFixedExpense) {
+    return this.http.put<void>(
+      `${this.baseUrl}/monthly-fixed-expenses/${id}`,
+      monthlyFixedExpense,
+    );
+  }
+
+  deleteMonthlyFixedExpense(id: number) {
+    return this.http.delete<void>(`${this.baseUrl}/monthly-fixed-expenses/${id}`);
   }
 
   createTag(tag: CreateTag) {
@@ -157,6 +172,13 @@ export class FinanceApiService {
 
   deleteFixedExpense(id: number) {
     return this.http.delete<void>(`${this.baseUrl}/fixed-expenses/${id}`);
+  }
+
+  saveFixedExpenseForecastWeek(id: number, forecastWeek: SaveFixedExpenseForecastWeek) {
+    return this.http.put<void>(
+      `${this.baseUrl}/fixed-expenses/${id}/forecast-week`,
+      forecastWeek,
+    );
   }
 
   backupDatabase() {

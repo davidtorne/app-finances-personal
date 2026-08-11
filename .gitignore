@@ -8,6 +8,7 @@ obj/
 node_modules/
 dist/
 .angular/
+.vs/
 Microsoft/
 /data/
 server/Data/*.db

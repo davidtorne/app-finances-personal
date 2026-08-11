@@ -60,8 +60,10 @@ public sealed record WeeklyForecastWeekDto(
     DateOnly To,
     bool IsCurrent,
     bool IsEstimate,
-    decimal ExpectedIncome,
-    decimal ExpectedExpense,
+    decimal ForecastIncome,
+    decimal ForecastExpense,
+    decimal ActualIncome,
+    decimal ActualExpense,
     decimal RemainingBalance,
     IReadOnlyCollection<TagTotalDto> TagTotals);
 
@@ -70,17 +72,13 @@ public sealed record WeeklyForecastDto(
     DateOnly MonthTo,
     decimal MonthIncome,
     string IncomeSource,
+    decimal RemainingWeeklyBudget,
+    int RemainingWeeksCount,
     IReadOnlyCollection<WeeklyForecastWeekDto> Weeks);
 
-public sealed record ForecastCategoryDto(
-    string Key,
-    string TypeName,
-    string SubtypeName,
-    decimal AverageMonthlyAmount,
-    bool IsConfigured,
-    int? Week);
+public sealed record MonthlyFixedExpenseDto(int Id, string Description, decimal Amount, int Week);
 
-public sealed record SaveForecastCategoryRequest(string Key, int? Week);
+public sealed record CreateMonthlyFixedExpenseRequest(string Description, decimal Amount, int Week);
 
 public sealed record TagTotalDto(
     int TagId,
@@ -133,6 +131,7 @@ public sealed record FixedExpenseDto(
     string Description,
     decimal Amount,
     int Month,
+    int? ForecastWeek,
     IReadOnlyCollection<TransactionTagDto> Tags);
 
 public sealed record CreateFixedExpenseRequest(
@@ -141,6 +140,8 @@ public sealed record CreateFixedExpenseRequest(
     decimal Amount,
     int Month,
     IReadOnlyCollection<int> TagIds);
+
+public sealed record SaveFixedExpenseForecastWeekRequest(int? Week);
 
 public sealed record DriveStatusDto(
     bool HasCredentials,
