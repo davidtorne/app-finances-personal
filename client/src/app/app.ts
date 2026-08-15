@@ -23,6 +23,9 @@ import {
   FinanceTransaction,
   FixedExpense,
   MonthlyFixedExpense,
+  SavingsAccount,
+  SavingsMovement,
+  SavingsMovementType,
   TagGroup,
   TransactionTag,
   TransactionType,
@@ -45,7 +48,7 @@ interface TransactionSuggestion {
   styleUrl: './app.scss',
 })
 export class App implements OnInit, OnDestroy {
-  protected activeSection: 'consultation' | 'entry' | 'budgets' | 'fixed-expenses' | 'weekly-forecast' = 'consultation';
+  protected activeSection: 'consultation' | 'entry' | 'budgets' | 'fixed-expenses' | 'weekly-forecast' | 'savings' = 'consultation';
   protected readonly summary = signal<FinanceSummary | null>(null);
   protected readonly transactions = signal<FinanceTransaction[]>([]);
   protected readonly tagGroups = signal<TagGroup[]>([]);
@@ -143,6 +146,31 @@ export class App implements OnInit, OnDestroy {
   };
   protected editingMonthlyFixedExpenseId = 0;
 
+  protected readonly savingsAccounts = signal<SavingsAccount[]>([]);
+  protected readonly savingsMovements = signal<SavingsMovement[]>([]);
+  protected readonly savingSavingsMovement = signal(false);
+  protected readonly savingSavingsAccount = signal(false);
+  protected savingsMovementFilterAccountId = 0;
+  protected savingsYear = new Date().getFullYear();
+  protected savingsMovementForm = {
+    savingsAccountId: 0,
+    type: 'deposit' as SavingsMovementType,
+    amount: null as number | null,
+    date: this.today(),
+    description: '',
+  };
+  protected newSavingsAccount = {
+    name: '',
+    color: '#2563eb',
+  };
+  protected showNewSavingsAccountForm = false;
+  protected readonly savingTagSavingsLink = signal(false);
+  protected tagSavingsLinkForm = {
+    tagGroupId: 0,
+    tagId: 0,
+    savingsAccountId: 0,
+  };
+
   private financialDataSubscription?: Subscription;
 
   constructor(private readonly api: FinanceApiService) {
@@ -216,6 +244,7 @@ export class App implements OnInit, OnDestroy {
     this.loadDriveStatus();
     this.loadWeeklyForecast();
     this.loadMonthlyFixedExpenses();
+    this.loadSavingsAccounts();
   }
 
   protected refreshFinancialData(): void {
@@ -418,7 +447,7 @@ export class App implements OnInit, OnDestroy {
     this.refreshFinancialData();
   }
 
-  protected showSection(section: 'consultation' | 'entry' | 'budgets' | 'fixed-expenses' | 'weekly-forecast'): void {
+  protected showSection(section: 'consultation' | 'entry' | 'budgets' | 'fixed-expenses' | 'weekly-forecast' | 'savings'): void {
     this.activeSection = section;
     if (section === 'budgets') {
       this.loadBudgets();
@@ -428,6 +457,9 @@ export class App implements OnInit, OnDestroy {
       this.loadWeeklyForecast();
       this.loadFixedExpenses();
       this.loadMonthlyFixedExpenses();
+    } else if (section === 'savings') {
+      this.loadSavingsAccounts();
+      this.loadSavingsMovements();
     }
   }
 
@@ -844,6 +876,229 @@ export class App implements OnInit, OnDestroy {
       },
       error: () => this.error.set('No s’ha pogut eliminar la despesa fixa.'),
     });
+  }
+
+  protected get savingsTotalBalance(): number {
+    return this.savingsAccounts().reduce((sum, account) => sum + account.balance, 0);
+  }
+
+  protected loadSavingsAccounts(): void {
+    this.api.getSavingsAccounts(this.savingsYear).subscribe({
+      next: (accounts) => {
+        this.savingsAccounts.set(accounts);
+        if (!this.savingsMovementForm.savingsAccountId && accounts.length) {
+          this.savingsMovementForm.savingsAccountId = accounts[0].id;
+        }
+      },
+      error: () => this.error.set('No s’han pogut carregar els comptes d’estalvi.'),
+    });
+  }
+
+  protected loadSavingsMovements(): void {
+    const accountId = this.savingsMovementFilterAccountId || undefined;
+    this.api.getSavingsMovements(accountId, this.savingsYear).subscribe({
+      next: (movements) => this.savingsMovements.set(movements),
+      error: () => this.error.set('No s’han pogut carregar els moviments d’estalvi.'),
+    });
+  }
+
+  protected changeSavingsMovementFilter(): void {
+    this.loadSavingsMovements();
+  }
+
+  protected navigateSavingsYear(direction: -1 | 1): void {
+    if (direction === 1 && this.isCurrentSavingsYear()) {
+      return;
+    }
+
+    this.savingsYear += direction;
+    this.loadSavingsAccounts();
+    this.loadSavingsMovements();
+  }
+
+  protected goToCurrentSavingsYear(): void {
+    if (this.isCurrentSavingsYear()) {
+      return;
+    }
+
+    this.savingsYear = new Date().getFullYear();
+    this.loadSavingsAccounts();
+    this.loadSavingsMovements();
+  }
+
+  protected isCurrentSavingsYear(): boolean {
+    return this.savingsYear === new Date().getFullYear();
+  }
+
+  protected saveSavingsMovement(): void {
+    if (
+      !this.savingsMovementForm.savingsAccountId ||
+      !this.savingsMovementForm.amount ||
+      !this.savingsMovementForm.description.trim()
+    ) {
+      this.error.set('Selecciona un compte i indica un concepte i un import superior a zero.');
+      return;
+    }
+
+    this.savingSavingsMovement.set(true);
+    this.error.set('');
+    this.notice.set('');
+    this.api
+      .createSavingsMovement({
+        ...this.savingsMovementForm,
+        amount: this.savingsMovementForm.amount,
+        description: this.savingsMovementForm.description.trim(),
+      })
+      .pipe(finalize(() => this.savingSavingsMovement.set(false)))
+      .subscribe({
+        next: () => {
+          const accountId = this.savingsMovementForm.savingsAccountId;
+          this.savingsMovementForm = {
+            savingsAccountId: accountId,
+            type: 'deposit',
+            amount: null,
+            date: this.today(),
+            description: '',
+          };
+          this.notice.set('Moviment d’estalvi guardat correctament.');
+          this.loadSavingsAccounts();
+          this.loadSavingsMovements();
+        },
+        error: (response) => {
+          this.error.set(
+            typeof response.error === 'string'
+              ? response.error
+              : 'No s’ha pogut guardar el moviment d’estalvi.',
+          );
+        },
+      });
+  }
+
+  protected deleteSavingsMovement(id: number): void {
+    this.api.deleteSavingsMovement(id).subscribe({
+      next: () => {
+        this.loadSavingsAccounts();
+        this.loadSavingsMovements();
+      },
+      error: () => this.error.set('No s’ha pogut eliminar el moviment d’estalvi.'),
+    });
+  }
+
+  protected toggleNewSavingsAccountForm(): void {
+    this.showNewSavingsAccountForm = !this.showNewSavingsAccountForm;
+  }
+
+  protected createSavingsAccount(): void {
+    if (!this.newSavingsAccount.name.trim()) {
+      this.error.set('Escriu el nom del compte d’estalvi.');
+      return;
+    }
+
+    this.savingSavingsAccount.set(true);
+    this.error.set('');
+    this.notice.set('');
+    this.api
+      .createSavingsAccount({
+        ...this.newSavingsAccount,
+        name: this.newSavingsAccount.name.trim(),
+      })
+      .pipe(finalize(() => this.savingSavingsAccount.set(false)))
+      .subscribe({
+        next: () => {
+          this.newSavingsAccount = { name: '', color: '#2563eb' };
+          this.showNewSavingsAccountForm = false;
+          this.notice.set('Compte d’estalvi creat correctament.');
+          this.loadSavingsAccounts();
+        },
+        error: () => this.error.set('No s’ha pogut crear el compte d’estalvi.'),
+      });
+  }
+
+  protected deleteSavingsAccount(account: SavingsAccount): void {
+    if (!window.confirm(`Vols eliminar el compte “${account.name}” i tots els seus moviments?`)) {
+      return;
+    }
+
+    this.api.deleteSavingsAccount(account.id).subscribe({
+      next: () => {
+        if (this.savingsMovementFilterAccountId === account.id) {
+          this.savingsMovementFilterAccountId = 0;
+        }
+        this.notice.set('Compte d’estalvi eliminat.');
+        this.loadSavingsAccounts();
+        this.loadSavingsMovements();
+      },
+      error: () => this.error.set('No s’ha pogut eliminar el compte d’estalvi.'),
+    });
+  }
+
+  protected get linkedSavingsTags(): { tag: TransactionTag; accountName: string }[] {
+    const accountNamesById = new Map(this.savingsAccounts().map((account) => [account.id, account.name]));
+    const result: { tag: TransactionTag; accountName: string }[] = [];
+    for (const group of this.tagGroups()) {
+      for (const tag of group.tags) {
+        if (tag.linkedSavingsAccountId) {
+          result.push({
+            tag: {
+              id: tag.id,
+              groupId: group.id,
+              groupName: group.name,
+              name: tag.name,
+              color: tag.color,
+            },
+            accountName: accountNamesById.get(tag.linkedSavingsAccountId) ?? '—',
+          });
+        }
+      }
+    }
+    return result;
+  }
+
+  protected get tagSavingsLinkGroupTags() {
+    return this.tagGroups().find((group) => group.id === this.tagSavingsLinkForm.tagGroupId)?.tags ?? [];
+  }
+
+  protected saveTagSavingsLink(): void {
+    if (!this.tagSavingsLinkForm.tagId || !this.tagSavingsLinkForm.savingsAccountId) {
+      this.error.set('Selecciona una categoria i un compte d’estalvi.');
+      return;
+    }
+
+    this.savingTagSavingsLink.set(true);
+    this.error.set('');
+    this.notice.set('');
+    this.api
+      .saveTagSavingsLink(this.tagSavingsLinkForm.tagId, {
+        savingsAccountId: this.tagSavingsLinkForm.savingsAccountId,
+      })
+      .pipe(finalize(() => this.savingTagSavingsLink.set(false)))
+      .subscribe({
+        next: () => {
+          this.tagSavingsLinkForm = { tagGroupId: 0, tagId: 0, savingsAccountId: 0 };
+          this.notice.set('Categoria vinculada correctament.');
+          this.refreshSavingsAndTags();
+        },
+        error: () => this.error.set('No s’ha pogut vincular la categoria.'),
+      });
+  }
+
+  protected removeTagSavingsLink(tagId: number): void {
+    this.api.saveTagSavingsLink(tagId, { savingsAccountId: null }).subscribe({
+      next: () => {
+        this.notice.set('Vinculació eliminada.');
+        this.refreshSavingsAndTags();
+      },
+      error: () => this.error.set('No s’ha pogut eliminar la vinculació.'),
+    });
+  }
+
+  private refreshSavingsAndTags(): void {
+    this.api.getTagGroups().subscribe({
+      next: (groups) => this.tagGroups.set(groups),
+      error: () => this.setConnectionError(),
+    });
+    this.loadSavingsAccounts();
+    this.loadSavingsMovements();
   }
 
   protected navigatePeriod(direction: -1 | 1): void {

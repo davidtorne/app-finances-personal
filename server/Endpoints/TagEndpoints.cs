@@ -26,7 +26,7 @@ public static class TagEndpoints
                 item.IsRequired,
                 item.Tags
                     .OrderBy(tag => tag.Name)
-                    .Select(tag => new TagDto(tag.Id, tag.Name, tag.Color, tag.ParentTagId))
+                    .Select(tag => new TagDto(tag.Id, tag.Name, tag.Color, tag.ParentTagId, tag.LinkedSavingsAccountId))
                     .ToArray()));
         });
 
@@ -86,6 +86,32 @@ public static class TagEndpoints
             db.Tags.Add(tag);
             await db.SaveChangesAsync();
             return Results.Created($"/api/tags/{tag.Id}", tag.Id);
+        });
+
+        group.MapPut("/tags/{id:int}/savings-link", async (int id, SaveTagSavingsLinkRequest request, FinanceDbContext db) =>
+        {
+            var tag = await db.Tags.FindAsync(id);
+            if (tag is null)
+            {
+                return Results.NotFound("El tag no existeix.");
+            }
+
+            if (request.SavingsAccountId is int savingsAccountId)
+            {
+                if (!await db.SavingsAccounts.AnyAsync(item => item.Id == savingsAccountId))
+                {
+                    return Results.BadRequest("El compte d'estalvi no existeix.");
+                }
+
+                tag.LinkedSavingsAccountId = savingsAccountId;
+            }
+            else
+            {
+                tag.LinkedSavingsAccountId = null;
+            }
+
+            await db.SaveChangesAsync();
+            return Results.NoContent();
         });
 
         group.MapDelete("/tags/{id:int}", async (int id, FinanceDbContext db) =>

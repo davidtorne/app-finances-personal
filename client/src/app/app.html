@@ -168,6 +168,13 @@
         </span>
       }
     </button>
+    <button
+      type="button"
+      [class.active]="activeSection === 'savings'"
+      (click)="showSection('savings')"
+    >
+      Estalvi i inversió
+    </button>
   </nav>
 
   @if (activeSection === 'consultation') {
@@ -1271,5 +1278,371 @@
         </div>
       </section>
     }
+  } @else if (activeSection === 'savings') {
+    <section class="panel weekly-forecast-toolbar">
+      <div>
+        <p class="eyebrow">Estalvi i inversió</p>
+        <h2>Any {{ savingsYear }}</h2>
+      </div>
+      <div class="weekly-forecast-toolbar-actions">
+        <div class="period-navigation" aria-label="Navegació d'any">
+          <button type="button" (click)="navigateSavingsYear(-1)">&lt; Anterior</button>
+          <span class="forecast-month-label">{{ savingsYear }}</span>
+          <button
+            type="button"
+            (click)="goToCurrentSavingsYear()"
+            [disabled]="isCurrentSavingsYear()"
+          >
+            Actual
+          </button>
+          <button
+            type="button"
+            (click)="navigateSavingsYear(1)"
+            [disabled]="isCurrentSavingsYear()"
+          >
+            Següent &gt;
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <section class="summary-grid" aria-label="Resum d'estalvi i inversió">
+      @for (account of savingsAccounts(); track account.id) {
+        <article class="summary-card">
+          <span>{{ account.name }}</span>
+          <strong
+            [class.positive]="account.balance >= 0"
+            [class.negative]="account.balance < 0"
+          >
+            {{ formatCurrency(account.balance) }}
+          </strong>
+          <small>
+            {{ savingsYear }}: aportat {{ formatCurrency(account.totalDeposits) }} · retirat {{ formatCurrency(account.totalWithdrawals) }}
+          </small>
+        </article>
+      }
+      <article class="summary-card balance">
+        <span>Total estalviat</span>
+        <strong>{{ formatCurrency(savingsTotalBalance) }}</strong>
+        <small>Suma de tots els comptes l'any {{ savingsYear }}</small>
+      </article>
+    </section>
+
+    <section class="entry-grid">
+      <article class="panel">
+        <div class="panel-heading">
+          <div>
+            <p class="eyebrow">Estalvi i inversió</p>
+            <h2>Afegir moviment</h2>
+          </div>
+        </div>
+        <p class="panel-description">
+          Registra el que envies o retires dels teus comptes d'estalvi i inversió,
+          a banda dels moviments mensuals de despeses. Per introduir els diners que
+          ja hi tens ara, crea una entrada amb el concepte «Saldo inicial».
+        </p>
+
+        @if (savingsAccounts().length) {
+          <form (ngSubmit)="saveSavingsMovement()">
+            <label class="field">
+              <span>Compte</span>
+              <select
+                name="savings-movement-account"
+                [(ngModel)]="savingsMovementForm.savingsAccountId"
+                required
+              >
+                @for (account of savingsAccounts(); track account.id) {
+                  <option [ngValue]="account.id">{{ account.name }}</option>
+                }
+              </select>
+            </label>
+
+            <div class="type-switch">
+              <label [class.selected]="savingsMovementForm.type === 'deposit'">
+                <input
+                  type="radio"
+                  name="savings-movement-type"
+                  value="deposit"
+                  [(ngModel)]="savingsMovementForm.type"
+                />
+                Entrada
+              </label>
+              <label [class.selected]="savingsMovementForm.type === 'withdrawal'">
+                <input
+                  type="radio"
+                  name="savings-movement-type"
+                  value="withdrawal"
+                  [(ngModel)]="savingsMovementForm.type"
+                />
+                Sortida
+              </label>
+            </div>
+
+            <label class="field">
+              <span>Concepte</span>
+              <input
+                name="savings-movement-description"
+                [(ngModel)]="savingsMovementForm.description"
+                placeholder="Ex. Traspàs mensual, Saldo inicial..."
+                maxlength="240"
+                required
+              />
+            </label>
+
+            <div class="field-row">
+              <label class="field">
+                <span>Import</span>
+                <div class="amount-input">
+                  <input
+                    type="number"
+                    name="savings-movement-amount"
+                    [(ngModel)]="savingsMovementForm.amount"
+                    min="0.01"
+                    step="0.01"
+                    placeholder="0,00"
+                    required
+                  />
+                  <b>€</b>
+                </div>
+              </label>
+              <label class="field">
+                <span>Data</span>
+                <input
+                  type="date"
+                  name="savings-movement-date"
+                  [(ngModel)]="savingsMovementForm.date"
+                  required
+                />
+              </label>
+            </div>
+
+            <button class="primary-button" type="submit" [disabled]="savingSavingsMovement()">
+              {{ savingSavingsMovement() ? 'Guardant...' : 'Guardar moviment' }}
+            </button>
+          </form>
+        } @else {
+          <div class="empty-state">
+            <span>Crea primer un compte d'estalvi o inversió.</span>
+          </div>
+        }
+      </article>
+
+      <article class="panel tag-manager">
+        <div class="panel-heading">
+          <div>
+            <p class="eyebrow">Configuració</p>
+            <h2>Comptes</h2>
+          </div>
+          <button type="button" class="text-action" (click)="toggleNewSavingsAccountForm()">
+            {{ showNewSavingsAccountForm ? 'Cancel·lar' : 'Nou compte' }}
+          </button>
+        </div>
+
+        @if (showNewSavingsAccountForm) {
+          <div class="tag-manager-fields">
+            <label class="field">
+              <span>Nom del compte</span>
+              <input [(ngModel)]="newSavingsAccount.name" placeholder="Ex. Fons d'emergència" />
+            </label>
+            <label class="field">
+              <span>Color</span>
+              <input
+                class="color-input"
+                type="color"
+                [(ngModel)]="newSavingsAccount.color"
+                aria-label="Color del compte"
+              />
+            </label>
+            <button
+              class="secondary-button"
+              type="button"
+              (click)="createSavingsAccount()"
+              [disabled]="savingSavingsAccount()"
+            >
+              {{ savingSavingsAccount() ? 'Afegint...' : 'Afegir compte' }}
+            </button>
+          </div>
+        }
+
+        @if (savingsAccounts().length) {
+          <div class="budget-item-list">
+            @for (account of savingsAccounts(); track account.id) {
+              <article class="movement-row">
+                <div class="movement-icon" [style.background]="account.color"></div>
+                <div class="movement-main">
+                  <strong>{{ account.name }}</strong>
+                  <span>
+                    Aportat {{ formatCurrency(account.totalDeposits) }} · Retirat {{ formatCurrency(account.totalWithdrawals) }}
+                  </span>
+                </div>
+                <strong
+                  class="movement-amount"
+                  [class.positive]="account.balance >= 0"
+                  [class.negative]="account.balance < 0"
+                >
+                  {{ formatCurrency(account.balance) }}
+                </strong>
+                <button
+                  type="button"
+                  class="delete-button"
+                  (click)="deleteSavingsAccount(account)"
+                  aria-label="Eliminar compte"
+                >
+                  ×
+                </button>
+              </article>
+            }
+          </div>
+        } @else {
+          <div class="empty-state">
+            <span>Encara no hi ha comptes d'estalvi.</span>
+          </div>
+        }
+      </article>
+
+      <article class="panel tag-manager">
+        <div class="panel-heading">
+          <div>
+            <p class="eyebrow">Configuració</p>
+            <h2>Categories vinculades</h2>
+          </div>
+        </div>
+        <p class="panel-description">
+          Vincula una categoria (tipus o subtipus) a un compte. Els moviments
+          d'«Entrada de dades» amb aquesta categoria es comptabilitzaran
+          automàticament: una despesa suma al compte i un ingrés hi resta.
+        </p>
+
+        @if (linkedSavingsTags.length) {
+          <div class="budget-item-list">
+            @for (item of linkedSavingsTags; track item.tag.id) {
+              <article class="movement-row">
+                <div class="movement-icon" [style.background]="item.tag.color"></div>
+                <div class="movement-main">
+                  <strong>{{ item.tag.name }}</strong>
+                  <span>{{ item.tag.groupName }} → {{ item.accountName }}</span>
+                </div>
+                <button
+                  type="button"
+                  class="delete-button"
+                  (click)="removeTagSavingsLink(item.tag.id)"
+                  aria-label="Eliminar vinculació"
+                >
+                  ×
+                </button>
+              </article>
+            }
+          </div>
+        } @else {
+          <div class="empty-state">
+            <span>Encara no hi ha categories vinculades.</span>
+          </div>
+        }
+
+        <div class="tag-manager-fields">
+          <label class="field">
+            <span>Grup</span>
+            <select [(ngModel)]="tagSavingsLinkForm.tagGroupId">
+              <option [ngValue]="0">Selecciona un grup</option>
+              @for (group of tagGroups(); track group.id) {
+                <option [ngValue]="group.id">{{ group.name }}</option>
+              }
+            </select>
+          </label>
+          <label class="field">
+            <span>Categoria</span>
+            <select [(ngModel)]="tagSavingsLinkForm.tagId">
+              <option [ngValue]="0">Selecciona una categoria</option>
+              @for (tag of tagSavingsLinkGroupTags; track tag.id) {
+                <option [ngValue]="tag.id">{{ tag.name }}</option>
+              }
+            </select>
+          </label>
+          <label class="field">
+            <span>Compte</span>
+            <select [(ngModel)]="tagSavingsLinkForm.savingsAccountId">
+              <option [ngValue]="0">Selecciona un compte</option>
+              @for (account of savingsAccounts(); track account.id) {
+                <option [ngValue]="account.id">{{ account.name }}</option>
+              }
+            </select>
+          </label>
+          <button
+            class="secondary-button"
+            type="button"
+            (click)="saveTagSavingsLink()"
+            [disabled]="savingTagSavingsLink()"
+          >
+            {{ savingTagSavingsLink() ? 'Vinculant...' : 'Vincular categoria' }}
+          </button>
+        </div>
+      </article>
+    </section>
+
+    <section class="panel movements">
+      <div class="panel-heading">
+        <div>
+          <p class="eyebrow">Historial</p>
+          <h2>Moviments d'estalvi i inversió</h2>
+        </div>
+        <span class="count">{{ savingsMovements().length }} moviments</span>
+      </div>
+
+      <label class="field">
+        <span>Filtra per compte</span>
+        <select
+          [(ngModel)]="savingsMovementFilterAccountId"
+          (ngModelChange)="changeSavingsMovementFilter()"
+        >
+          <option [ngValue]="0">Tots els comptes</option>
+          @for (account of savingsAccounts(); track account.id) {
+            <option [ngValue]="account.id">{{ account.name }}</option>
+          }
+        </select>
+      </label>
+
+      @if (savingsMovements().length) {
+        <div class="movement-list">
+          @for (movement of savingsMovements(); track movement.source + '-' + movement.id) {
+            <article class="movement-row">
+              <div class="movement-icon" [class.income]="movement.type === 'deposit'">
+                {{ movement.type === 'deposit' ? '+' : '-' }}
+              </div>
+              <div class="movement-main">
+                <strong>{{ movement.description }}</strong>
+                <span>
+                  {{ movement.savingsAccountName }} · {{ formatDate(movement.date) }}
+                  @if (movement.source === 'transaction') {
+                    · automàtic (categoria)
+                  }
+                </span>
+              </div>
+              <strong
+                class="movement-amount"
+                [class.positive]="movement.type === 'deposit'"
+                [class.negative]="movement.type === 'withdrawal'"
+              >
+                {{ movement.type === 'deposit' ? '+' : '-' }}{{ formatCurrency(movement.amount) }}
+              </strong>
+              @if (movement.source === 'manual') {
+                <button
+                  type="button"
+                  class="delete-button"
+                  (click)="deleteSavingsMovement(movement.id)"
+                  aria-label="Eliminar moviment"
+                >
+                  ×
+                </button>
+              }
+            </article>
+          }
+        </div>
+      } @else {
+        <div class="empty-state large">
+          <strong>Encara no hi ha moviments</strong>
+          <span>Registra les entrades i sortides d'estalvi i inversió.</span>
+        </div>
+      }
+    </section>
   }
 </main>

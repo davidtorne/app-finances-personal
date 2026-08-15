@@ -118,4 +118,46 @@ public static class DatabaseSchema
             );
             """);
     }
+
+    public static async Task EnsureSavingsTablesAsync(FinanceDbContext db)
+    {
+        await db.Database.ExecuteSqlRawAsync("""
+            CREATE TABLE IF NOT EXISTS SavingsAccounts (
+                Id INTEGER NOT NULL CONSTRAINT PK_SavingsAccounts PRIMARY KEY AUTOINCREMENT,
+                Name TEXT NOT NULL,
+                Color TEXT NOT NULL DEFAULT '#2563eb',
+                CreatedAtUtc TEXT NOT NULL
+            );
+            CREATE TABLE IF NOT EXISTS SavingsMovements (
+                Id INTEGER NOT NULL CONSTRAINT PK_SavingsMovements PRIMARY KEY AUTOINCREMENT,
+                SavingsAccountId INTEGER NOT NULL,
+                Type TEXT NOT NULL,
+                Amount TEXT NOT NULL,
+                Date TEXT NOT NULL,
+                Description TEXT NOT NULL,
+                CreatedAtUtc TEXT NOT NULL,
+                CONSTRAINT FK_SavingsMovements_SavingsAccounts_SavingsAccountId FOREIGN KEY (SavingsAccountId) REFERENCES SavingsAccounts (Id) ON DELETE CASCADE
+            );
+            CREATE INDEX IF NOT EXISTS IX_SavingsMovements_SavingsAccountId ON SavingsMovements (SavingsAccountId);
+            """);
+    }
+
+    public static async Task EnsureTagSavingsLinkColumnAsync(FinanceDbContext db)
+    {
+        var connection = db.Database.GetDbConnection();
+        if (connection.State != ConnectionState.Open)
+        {
+            await connection.OpenAsync();
+        }
+
+        await using var checkColumn = connection.CreateCommand();
+        checkColumn.CommandText = "SELECT COUNT(*) FROM pragma_table_info('Tags') WHERE name = 'LinkedSavingsAccountId';";
+        var hasColumn = Convert.ToInt32(await checkColumn.ExecuteScalarAsync()) > 0;
+        if (!hasColumn)
+        {
+            await using var addColumn = connection.CreateCommand();
+            addColumn.CommandText = "ALTER TABLE Tags ADD COLUMN LinkedSavingsAccountId INTEGER NULL REFERENCES SavingsAccounts (Id);";
+            await addColumn.ExecuteNonQueryAsync();
+        }
+    }
 }

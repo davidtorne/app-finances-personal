@@ -17,6 +17,8 @@ public sealed class FinanceDbContext(DbContextOptions<FinanceDbContext> options)
     public DbSet<FixedExpenseTag> FixedExpenseTags => Set<FixedExpenseTag>();
     public DbSet<DriveSettings> DriveSettings => Set<DriveSettings>();
     public DbSet<MonthlyFixedExpense> MonthlyFixedExpenses => Set<MonthlyFixedExpense>();
+    public DbSet<SavingsAccount> SavingsAccounts => Set<SavingsAccount>();
+    public DbSet<SavingsMovement> SavingsMovements => Set<SavingsMovement>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -41,6 +43,10 @@ public sealed class FinanceDbContext(DbContextOptions<FinanceDbContext> options)
                 .WithMany(item => item.Children)
                 .HasForeignKey(item => item.ParentTagId)
                 .OnDelete(DeleteBehavior.Restrict);
+            entity.HasOne(item => item.LinkedSavingsAccount)
+                .WithMany()
+                .HasForeignKey(item => item.LinkedSavingsAccountId)
+                .OnDelete(DeleteBehavior.SetNull);
         });
 
         modelBuilder.Entity<TransactionTag>(entity =>
@@ -116,6 +122,23 @@ public sealed class FinanceDbContext(DbContextOptions<FinanceDbContext> options)
         {
             entity.Property(item => item.Description).HasMaxLength(240);
             entity.Property(item => item.Amount).HasPrecision(18, 2);
+        });
+
+        modelBuilder.Entity<SavingsAccount>(entity =>
+        {
+            entity.Property(item => item.Name).HasMaxLength(80);
+            entity.Property(item => item.Color).HasMaxLength(16);
+        });
+
+        modelBuilder.Entity<SavingsMovement>(entity =>
+        {
+            entity.Property(item => item.Type).HasConversion<string>();
+            entity.Property(item => item.Amount).HasPrecision(18, 2);
+            entity.Property(item => item.Description).HasMaxLength(240);
+            entity.HasOne(item => item.SavingsAccount)
+                .WithMany(item => item.Movements)
+                .HasForeignKey(item => item.SavingsAccountId)
+                .OnDelete(DeleteBehavior.Cascade);
         });
     }
 }

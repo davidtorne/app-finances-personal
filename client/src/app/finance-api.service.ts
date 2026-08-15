@@ -7,6 +7,8 @@ import {
   CreateBudgetItem,
   CreateFixedExpense,
   CreateMonthlyFixedExpense,
+  CreateSavingsAccount,
+  CreateSavingsMovement,
   CreateTag,
   CreateTransaction,
   DriveStatus,
@@ -16,6 +18,9 @@ import {
   MonthlyFixedExpense,
   SaveDriveSettings,
   SaveFixedExpenseForecastWeek,
+  SaveTagSavingsLink,
+  SavingsAccount,
+  SavingsMovement,
   SummaryPeriod,
   TagGroup,
   WeeklyForecast,
@@ -113,6 +118,10 @@ export class FinanceApiService {
     return this.http.post<number>(`${this.baseUrl}/tags`, tag);
   }
 
+  saveTagSavingsLink(tagId: number, link: SaveTagSavingsLink) {
+    return this.http.put<void>(`${this.baseUrl}/tags/${tagId}/savings-link`, link);
+  }
+
   getBudgets() {
     return this.http.get<Budget[]>(`${this.baseUrl}/budgets/`);
   }
@@ -179,6 +188,43 @@ export class FinanceApiService {
       `${this.baseUrl}/fixed-expenses/${id}/forecast-week`,
       forecastWeek,
     );
+  }
+
+  getSavingsAccounts(year?: number) {
+    let params = new HttpParams();
+    if (year) {
+      params = params.set('year', year);
+    }
+
+    return this.http.get<SavingsAccount[]>(`${this.baseUrl}/savings/accounts`, { params });
+  }
+
+  createSavingsAccount(account: CreateSavingsAccount) {
+    return this.http.post<{ id: number }>(`${this.baseUrl}/savings/accounts`, account);
+  }
+
+  deleteSavingsAccount(id: number) {
+    return this.http.delete<void>(`${this.baseUrl}/savings/accounts/${id}`);
+  }
+
+  getSavingsMovements(accountId?: number, year?: number) {
+    let params = new HttpParams();
+    if (accountId) {
+      params = params.set('accountId', accountId);
+    }
+    if (year) {
+      params = params.set('year', year);
+    }
+
+    return this.http.get<SavingsMovement[]>(`${this.baseUrl}/savings/movements`, { params });
+  }
+
+  createSavingsMovement(movement: CreateSavingsMovement) {
+    return this.http.post<{ id: number }>(`${this.baseUrl}/savings/movements`, movement);
+  }
+
+  deleteSavingsMovement(id: number) {
+    return this.http.delete<void>(`${this.baseUrl}/savings/movements/${id}`);
   }
 
   backupDatabase() {

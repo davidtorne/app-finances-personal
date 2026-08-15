@@ -6,6 +6,7 @@ export interface Tag {
   name: string;
   color: string;
   parentTagId: number | null;
+  linkedSavingsAccountId: number | null;
 }
 
 export interface TagGroup {
@@ -168,6 +169,47 @@ export interface CreateFixedExpense {
 
 export interface SaveFixedExpenseForecastWeek {
   week: number | null;
+}
+
+export type SavingsMovementType = 'deposit' | 'withdrawal';
+
+export interface SavingsAccount {
+  id: number;
+  name: string;
+  color: string;
+  balance: number;
+  totalDeposits: number;
+  totalWithdrawals: number;
+}
+
+export interface CreateSavingsAccount {
+  name: string;
+  color: string;
+}
+
+export type SavingsMovementSource = 'manual' | 'transaction';
+
+export interface SavingsMovement {
+  id: number;
+  savingsAccountId: number;
+  savingsAccountName: string;
+  type: SavingsMovementType;
+  amount: number;
+  date: string;
+  description: string;
+  source: SavingsMovementSource;
+}
+
+export interface CreateSavingsMovement {
+  savingsAccountId: number;
+  type: SavingsMovementType;
+  amount: number;
+  date: string;
+  description: string;
+}
+
+export interface SaveTagSavingsLink {
+  savingsAccountId: number | null;
 }
 
 export interface BackupResult {

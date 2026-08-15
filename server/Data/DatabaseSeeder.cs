@@ -54,4 +54,17 @@ public static class DatabaseSeeder
         db.TagGroups.AddRange(provider, type, subtype);
         await db.SaveChangesAsync();
     }
+
+    public static async Task SeedSavingsAccountsAsync(FinanceDbContext db)
+    {
+        if (await db.SavingsAccounts.AnyAsync())
+        {
+            return;
+        }
+
+        db.SavingsAccounts.AddRange(
+            new SavingsAccount { Name = "Estalvi", Color = "#2563eb" },
+            new SavingsAccount { Name = "Inversió", Color = "#059669" });
+        await db.SaveChangesAsync();
+    }
 }

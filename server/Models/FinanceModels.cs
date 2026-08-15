@@ -45,6 +45,8 @@ public sealed class Tag
     public ICollection<TransactionTag> TransactionTags { get; set; } = [];
     public ICollection<BudgetItemTag> BudgetItemTags { get; set; } = [];
     public ICollection<FixedExpenseTag> FixedExpenseTags { get; set; } = [];
+    public int? LinkedSavingsAccountId { get; set; }
+    public SavingsAccount? LinkedSavingsAccount { get; set; }
 }
 
 public sealed class TransactionTag
@@ -121,5 +123,32 @@ public sealed class MonthlyFixedExpense
     public string Description { get; set; } = string.Empty;
     public decimal Amount { get; set; }
     public int Week { get; set; }
+    public DateTime CreatedAtUtc { get; set; } = DateTime.UtcNow;
+}
+
+public enum SavingsMovementType
+{
+    Deposit,
+    Withdrawal
+}
+
+public sealed class SavingsAccount
+{
+    public int Id { get; set; }
+    public string Name { get; set; } = string.Empty;
+    public string Color { get; set; } = "#2563eb";
+    public DateTime CreatedAtUtc { get; set; } = DateTime.UtcNow;
+    public ICollection<SavingsMovement> Movements { get; set; } = [];
+}
+
+public sealed class SavingsMovement
+{
+    public int Id { get; set; }
+    public int SavingsAccountId { get; set; }
+    public SavingsAccount SavingsAccount { get; set; } = null!;
+    public SavingsMovementType Type { get; set; }
+    public decimal Amount { get; set; }
+    public DateOnly Date { get; set; }
+    public string Description { get; set; } = string.Empty;
     public DateTime CreatedAtUtc { get; set; } = DateTime.UtcNow;
 }

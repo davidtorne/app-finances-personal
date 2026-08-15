@@ -4,7 +4,10 @@ public sealed record TagDto(
     int Id,
     string Name,
     string Color,
-    int? ParentTagId);
+    int? ParentTagId,
+    int? LinkedSavingsAccountId);
+
+public sealed record SaveTagSavingsLinkRequest(int? SavingsAccountId);
 
 public sealed record TagGroupDto(
     int Id,
@@ -154,6 +157,33 @@ public sealed record SaveDriveSettingsRequest(
     string ClientId,
     string? ClientSecret,
     bool AutoUpload);
+
+public sealed record SavingsAccountDto(
+    int Id,
+    string Name,
+    string Color,
+    decimal Balance,
+    decimal TotalDeposits,
+    decimal TotalWithdrawals);
+
+public sealed record CreateSavingsAccountRequest(string Name, string Color);
+
+public sealed record SavingsMovementDto(
+    int Id,
+    int SavingsAccountId,
+    string SavingsAccountName,
+    string Type,
+    decimal Amount,
+    DateOnly Date,
+    string Description,
+    string Source);
+
+public sealed record CreateSavingsMovementRequest(
+    int SavingsAccountId,
+    string Type,
+    decimal Amount,
+    DateOnly Date,
+    string Description);
 
 public sealed record BackupResultDto(
     string FileName,

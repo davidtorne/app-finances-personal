@@ -38,7 +38,10 @@ using (var scope = app.Services.CreateScope())
     await DatabaseSchema.EnsureFixedExpenseTablesAsync(db);
     await DatabaseSchema.EnsureDriveSettingsTableAsync(db);
     await DatabaseSchema.EnsureMonthlyFixedExpenseTablesAsync(db);
+    await DatabaseSchema.EnsureSavingsTablesAsync(db);
+    await DatabaseSchema.EnsureTagSavingsLinkColumnAsync(db);
     await DatabaseSeeder.SeedAsync(db);
+    await DatabaseSeeder.SeedSavingsAccountsAsync(db);
 }
 
 app.MapGet("/api/health", () => Results.Ok(new { status = "ok" }));
@@ -49,6 +52,7 @@ app.MapWeeklyForecastEndpoints();
 app.MapMonthlyFixedExpenseEndpoints();
 app.MapBudgetEndpoints();
 app.MapFixedExpenseEndpoints();
+app.MapSavingsEndpoints();
 app.MapBackupEndpoints();
 app.MapDriveEndpoints();
 
