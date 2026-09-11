@@ -89,19 +89,9 @@ public static class DatabaseSchema
         }
     }
 
-    public static async Task EnsureDriveSettingsTableAsync(FinanceDbContext db)
+    public static async Task DropDriveSettingsTableAsync(FinanceDbContext db)
     {
-        await db.Database.ExecuteSqlRawAsync("""
-            CREATE TABLE IF NOT EXISTS DriveSettings (
-                Id INTEGER NOT NULL CONSTRAINT PK_DriveSettings PRIMARY KEY,
-                ClientId TEXT NULL,
-                ClientSecret TEXT NULL,
-                RefreshToken TEXT NULL,
-                ConnectedAccountEmail TEXT NULL,
-                FolderId TEXT NULL,
-                AutoUpload INTEGER NOT NULL DEFAULT 1
-            );
-            """);
+        await db.Database.ExecuteSqlRawAsync("DROP TABLE IF EXISTS DriveSettings;");
     }
 
     public static async Task EnsureMonthlyFixedExpenseTablesAsync(FinanceDbContext db)

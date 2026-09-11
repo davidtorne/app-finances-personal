@@ -45,7 +45,7 @@
   gap: 10px;
 }
 
-.drive-settings-toggle {
+.backup-list-toggle {
   display: inline-flex;
   align-items: center;
   gap: 7px;
@@ -60,30 +60,36 @@
   white-space: nowrap;
 }
 
-.drive-dot {
-  width: 8px;
-  height: 8px;
-  border-radius: 50%;
-  background: #cbd5e1;
-}
-
-.drive-dot.connected {
-  background: #059669;
-}
-
-.drive-settings-panel {
+.backup-list-panel {
   margin-bottom: 24px;
 }
 
-.drive-auto-upload {
-  margin-bottom: 16px;
+.backup-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
 }
 
-.drive-status {
+.backup-list-item {
   display: flex;
   align-items: center;
+  justify-content: space-between;
   gap: 14px;
-  margin-top: 4px;
+  padding: 12px 14px;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+}
+
+.backup-name {
+  font-weight: 700;
+}
+
+.backup-meta {
+  color: #64748b;
+  font-size: 0.85rem;
 }
 
 h1,

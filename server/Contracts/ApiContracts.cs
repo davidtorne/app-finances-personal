@@ -146,18 +146,6 @@ public sealed record CreateFixedExpenseRequest(
 
 public sealed record SaveFixedExpenseForecastWeekRequest(int? Week);
 
-public sealed record DriveStatusDto(
-    bool HasCredentials,
-    string? ClientId,
-    bool Connected,
-    string? ConnectedAccountEmail,
-    bool AutoUpload);
-
-public sealed record SaveDriveSettingsRequest(
-    string ClientId,
-    string? ClientSecret,
-    bool AutoUpload);
-
 public sealed record SavingsAccountDto(
     int Id,
     string Name,
@@ -189,6 +177,4 @@ public sealed record BackupResultDto(
     string FileName,
     string RelativePath,
     long SizeBytes,
-    DateTime CreatedAt,
-    string DriveUploadStatus,
-    string? DriveError);
+    DateTime CreatedAt);

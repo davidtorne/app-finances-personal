@@ -11,12 +11,10 @@ import {
   CreateSavingsMovement,
   CreateTag,
   CreateTransaction,
-  DriveStatus,
   FinanceSummary,
   FinanceTransaction,
   FixedExpense,
   MonthlyFixedExpense,
-  SaveDriveSettings,
   SaveFixedExpenseForecastWeek,
   SaveTagSavingsLink,
   SavingsAccount,
@@ -231,15 +229,13 @@ export class FinanceApiService {
     return this.http.post<BackupResult>(`${this.baseUrl}/backups/database`, {});
   }
 
-  getDriveStatus() {
-    return this.http.get<DriveStatus>(`${this.baseUrl}/drive/status`);
+  getBackups() {
+    return this.http.get<BackupResult[]>(`${this.baseUrl}/backups/`);
   }
 
-  saveDriveSettings(settings: SaveDriveSettings) {
-    return this.http.post<void>(`${this.baseUrl}/drive/settings`, settings);
-  }
-
-  disconnectDrive() {
-    return this.http.post<void>(`${this.baseUrl}/drive/disconnect`, {});
+  downloadBackup(fileName: string) {
+    return this.http.get(`${this.baseUrl}/backups/${encodeURIComponent(fileName)}/download`, {
+      responseType: 'blob',
+    });
   }
 }

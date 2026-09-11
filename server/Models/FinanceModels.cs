@@ -106,16 +106,6 @@ public sealed class FixedExpenseTag
     public Tag Tag { get; set; } = null!;
 }
 
-public sealed class DriveSettings
-{
-    public int Id { get; set; } = 1;
-    public string? ClientId { get; set; }
-    public string? ClientSecret { get; set; }
-    public string? RefreshToken { get; set; }
-    public string? ConnectedAccountEmail { get; set; }
-    public string? FolderId { get; set; }
-    public bool AutoUpload { get; set; } = true;
-}
 
 public sealed class MonthlyFixedExpense
 {

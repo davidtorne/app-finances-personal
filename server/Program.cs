@@ -1,7 +1,6 @@
 using Microsoft.EntityFrameworkCore;
 using PersonalFinances.Api.Data;
 using PersonalFinances.Api.Endpoints;
-using PersonalFinances.Api.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -14,7 +13,6 @@ Directory.CreateDirectory(dataDirectory);
 builder.Services.AddDbContext<FinanceDbContext>(options =>
     options.UseSqlite($"Data Source={Path.Combine(dataDirectory, "finances.db")}"));
 builder.Services.AddHttpClient();
-builder.Services.AddScoped<GoogleDriveService>();
 
 builder.Services.AddCors(options =>
 {
@@ -36,7 +34,7 @@ using (var scope = app.Services.CreateScope())
     await db.Database.EnsureCreatedAsync();
     await DatabaseSchema.EnsureBudgetTablesAsync(db);
     await DatabaseSchema.EnsureFixedExpenseTablesAsync(db);
-    await DatabaseSchema.EnsureDriveSettingsTableAsync(db);
+    await DatabaseSchema.DropDriveSettingsTableAsync(db);
     await DatabaseSchema.EnsureMonthlyFixedExpenseTablesAsync(db);
     await DatabaseSchema.EnsureSavingsTablesAsync(db);
     await DatabaseSchema.EnsureTagSavingsLinkColumnAsync(db);
@@ -54,7 +52,6 @@ app.MapBudgetEndpoints();
 app.MapFixedExpenseEndpoints();
 app.MapSavingsEndpoints();
 app.MapBackupEndpoints();
-app.MapDriveEndpoints();
 
 if (Directory.Exists(app.Environment.WebRootPath))
 {

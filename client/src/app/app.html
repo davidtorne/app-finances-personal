@@ -15,14 +15,10 @@
       </button>
       <button
         type="button"
-        class="drive-settings-toggle"
-        (click)="toggleDriveSettings()"
-        aria-label="Configurar còpia a Google Drive"
+        class="backup-list-toggle"
+        (click)="toggleBackupList()"
       >
-        Drive
-        @if (driveStatus(); as status) {
-          <span class="drive-dot" [class.connected]="status.connected"></span>
-        }
+        Còpies de seguretat
       </button>
     </div>
   </header>
@@ -34,77 +30,39 @@
     <div class="notice">{{ notice() }}</div>
   }
 
-  @if (showDriveSettings) {
-    <section class="panel drive-settings-panel">
+  @if (showBackupList) {
+    <section class="panel backup-list-panel">
       <div class="panel-heading">
         <div>
           <p class="eyebrow">Còpies de seguretat</p>
-          <h2>Configuració de Google Drive</h2>
+          <h2>Últimes còpies</h2>
         </div>
-        <button type="button" class="text-action" (click)="toggleDriveSettings()">Tancar</button>
+        <button type="button" class="text-action" (click)="toggleBackupList()">Tancar</button>
       </div>
 
-      <p class="panel-description">
-        Crea unes credencials OAuth de tipus "Aplicació d'escriptori" a
-        <a href="https://console.cloud.google.com/apis/credentials" target="_blank" rel="noopener">Google Cloud Console</a>,
-        amb l'API de Google Drive activada, i enganxa aquí el Client ID i el Client Secret.
-      </p>
-
-      <form (ngSubmit)="saveDriveSettings()">
-        <label class="field">
-          <span>Client ID</span>
-          <input
-            name="drive-client-id"
-            [(ngModel)]="driveSettingsForm.clientId"
-            placeholder="xxxxxxxx.apps.googleusercontent.com"
-            required
-          />
-        </label>
-        <label class="field">
-          <span>Client Secret</span>
-          <input
-            name="drive-client-secret"
-            type="password"
-            [(ngModel)]="driveSettingsForm.clientSecret"
-            [placeholder]="driveStatus()?.hasCredentials ? 'Deixa-ho en blanc per mantenir el que ja tens desat' : ''"
-          />
-        </label>
-        <label class="tag-option drive-auto-upload">
-          <input type="checkbox" name="drive-auto-upload" [(ngModel)]="driveSettingsForm.autoUpload" />
-          Pujar automàticament cada còpia a Drive
-        </label>
-        <button class="secondary-button full-width" type="submit" [disabled]="savingDriveSettings()">
-          {{ savingDriveSettings() ? 'Desant...' : 'Desar configuració' }}
-        </button>
-      </form>
-
-      @if (driveStatus(); as status) {
-        <div class="drive-status">
-          @if (status.connected) {
-            <p class="positive">Connectat com a {{ status.connectedAccountEmail }}</p>
-            <button
-              type="button"
-              class="text-danger"
-              (click)="disconnectDrive()"
-              [disabled]="disconnectingDrive()"
-            >
-              {{ disconnectingDrive() ? 'Desconnectant...' : 'Desconnectar' }}
-            </button>
-          } @else {
-            <p>No connectat amb Google Drive.</p>
-            <button
-              type="button"
-              class="secondary-button"
-              (click)="connectDrive()"
-              [disabled]="!status.hasCredentials"
-            >
-              Connectar amb Google Drive
-            </button>
-            @if (!status.hasCredentials) {
-              <p class="panel-description">Desa primer el Client ID i el Client Secret.</p>
-            }
+      @if (loadingBackups()) {
+        <p class="panel-description">Carregant còpies...</p>
+      } @else if (!backups().length) {
+        <p class="panel-description">Encara no s'ha creat cap còpia de seguretat.</p>
+      } @else {
+        <ul class="backup-list">
+          @for (backup of backups(); track backup.fileName) {
+            <li class="backup-list-item">
+              <div>
+                <p class="backup-name">{{ backup.fileName }}</p>
+                <p class="backup-meta">{{ backup.createdAt | date:'dd/MM/yyyy HH:mm' }} · {{ formatBackupSize(backup.sizeBytes) }}</p>
+              </div>
+              <button
+                type="button"
+                class="secondary-button"
+                (click)="downloadBackup(backup.fileName)"
+                [disabled]="downloadingBackupFileName() === backup.fileName"
+              >
+                {{ downloadingBackupFileName() === backup.fileName ? 'Descarregant...' : 'Descarregar' }}
+              </button>
+            </li>
           }
-        </div>
+        </ul>
       }
     </section>
   }

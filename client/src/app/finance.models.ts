@@ -217,20 +217,4 @@ export interface BackupResult {
   relativePath: string;
   sizeBytes: number;
   createdAt: string;
-  driveUploadStatus: 'skipped' | 'uploaded' | 'failed';
-  driveError: string | null;
-}
-
-export interface DriveStatus {
-  hasCredentials: boolean;
-  clientId: string | null;
-  connected: boolean;
-  connectedAccountEmail: string | null;
-  autoUpload: boolean;
-}
-
-export interface SaveDriveSettings {
-  clientId: string;
-  clientSecret?: string;
-  autoUpload: boolean;
 }

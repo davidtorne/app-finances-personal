@@ -1,18 +1,29 @@
+using System.Text.RegularExpressions;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 using PersonalFinances.Api.Contracts;
 using PersonalFinances.Api.Data;
-using PersonalFinances.Api.Services;
 
 namespace PersonalFinances.Api.Endpoints;
 
-public static class BackupEndpoints
+public static partial class BackupEndpoints
 {
+    private const int MaxBackupsToKeep = 5;
+
     public static IEndpointRouteBuilder MapBackupEndpoints(this IEndpointRouteBuilder app)
     {
         var group = app.MapGroup("/api/backups");
 
-        group.MapPost("/database", async (FinanceDbContext db, IWebHostEnvironment environment, GoogleDriveService drive) =>
+        group.MapGet("/", (IWebHostEnvironment environment) =>
+        {
+            var backups = ListBackupFiles(GetBackupDirectory(environment))
+                .Select(ToBackupResultDto)
+                .ToList();
+
+            return Results.Ok(backups);
+        });
+
+        group.MapPost("/database", async (FinanceDbContext db, IWebHostEnvironment environment) =>
         {
             var databasePath = db.Database.GetDbConnection().DataSource;
             if (string.IsNullOrWhiteSpace(databasePath) || !File.Exists(databasePath))
@@ -20,7 +31,7 @@ public static class BackupEndpoints
                 return Results.NotFound("No s'ha trobat la base de dades.");
             }
 
-            var backupDirectory = Path.Combine(environment.ContentRootPath, "data", "backups");
+            var backupDirectory = GetBackupDirectory(environment);
             Directory.CreateDirectory(backupDirectory);
 
             var timestamp = DateTime.Now.ToString("yyyyMMdd-HHmmss");
@@ -33,35 +44,66 @@ public static class BackupEndpoints
 
             ((SqliteConnection)db.Database.GetDbConnection()).BackupDatabase(destination);
 
-            var info = new FileInfo(backupPath);
+            TrimOldBackups(backupDirectory);
 
-            var driveSettings = await drive.GetOrCreateSettingsAsync();
-            var driveUploadStatus = "skipped";
-            string? driveError = null;
+            return Results.Ok(ToBackupResultDto(new FileInfo(backupPath)));
+        });
 
-            if (!string.IsNullOrWhiteSpace(driveSettings.RefreshToken) && driveSettings.AutoUpload)
+        group.MapGet("/{fileName}/download", (string fileName, IWebHostEnvironment environment) =>
+        {
+            var safeFileName = Path.GetFileName(fileName);
+            if (!BackupFileNameRegex().IsMatch(safeFileName))
             {
-                try
-                {
-                    await drive.UploadBackupAsync(backupPath, backupFileName);
-                    driveUploadStatus = "uploaded";
-                }
-                catch (Exception ex)
-                {
-                    driveUploadStatus = "failed";
-                    driveError = ex.Message;
-                }
+                return Results.BadRequest("Nom de fitxer no vàlid.");
             }
 
-            return Results.Ok(new BackupResultDto(
-                backupFileName,
-                Path.Combine("data", "backups", backupFileName),
-                info.Length,
-                info.CreationTime,
-                driveUploadStatus,
-                driveError));
+            var backupPath = Path.Combine(GetBackupDirectory(environment), safeFileName);
+            if (!File.Exists(backupPath))
+            {
+                return Results.NotFound("No s'ha trobat la còpia de seguretat.");
+            }
+
+            return Results.File(backupPath, "application/octet-stream", safeFileName);
         });
 
         return app;
     }
+
+    private static string GetBackupDirectory(IWebHostEnvironment environment) =>
+        Path.Combine(environment.ContentRootPath, "data", "backups");
+
+    private static IEnumerable<FileInfo> ListBackupFiles(string backupDirectory)
+    {
+        if (!Directory.Exists(backupDirectory))
+        {
+            return [];
+        }
+
+        return new DirectoryInfo(backupDirectory)
+            .GetFiles("finances-backup-*.db")
+            .OrderByDescending(file => file.Name, StringComparer.Ordinal)
+            .Take(MaxBackupsToKeep);
+    }
+
+    private static void TrimOldBackups(string backupDirectory)
+    {
+        var filesToDelete = new DirectoryInfo(backupDirectory)
+            .GetFiles("finances-backup-*.db")
+            .OrderByDescending(file => file.Name, StringComparer.Ordinal)
+            .Skip(MaxBackupsToKeep);
+
+        foreach (var file in filesToDelete)
+        {
+            file.Delete();
+        }
+    }
+
+    private static BackupResultDto ToBackupResultDto(FileInfo file) => new(
+        file.Name,
+        Path.Combine("data", "backups", file.Name),
+        file.Length,
+        file.CreationTime);
+
+    [GeneratedRegex(@"^finances-backup-\d{8}-\d{6}\.db$")]
+    private static partial Regex BackupFileNameRegex();
 }

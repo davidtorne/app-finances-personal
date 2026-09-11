@@ -16,9 +16,9 @@ import {
 } from 'rxjs';
 import { FinanceApiService } from './finance-api.service';
 import {
+  BackupResult,
   Budget,
   BudgetItem,
-  DriveStatus,
   FinanceSummary,
   FinanceTransaction,
   FixedExpense,
@@ -68,15 +68,10 @@ export class App implements OnInit, OnDestroy {
   protected readonly error = signal('');
   protected readonly notice = signal('');
 
-  protected readonly driveStatus = signal<DriveStatus | null>(null);
-  protected readonly savingDriveSettings = signal(false);
-  protected readonly disconnectingDrive = signal(false);
-  protected showDriveSettings = false;
-  protected driveSettingsForm = {
-    clientId: '',
-    clientSecret: '',
-    autoUpload: true,
-  };
+  protected readonly backups = signal<BackupResult[]>([]);
+  protected readonly loadingBackups = signal(false);
+  protected readonly downloadingBackupFileName = signal<string | null>(null);
+  protected showBackupList = false;
 
   protected transactionForm = {
     type: 'expense' as TransactionType,
@@ -241,7 +236,6 @@ export class App implements OnInit, OnDestroy {
     this.refreshFinancialData();
     this.loadBudgets();
     this.loadFixedExpenses();
-    this.loadDriveStatus();
     this.loadWeeklyForecast();
     this.loadMonthlyFixedExpenses();
     this.loadSavingsAccounts();
@@ -472,102 +466,61 @@ export class App implements OnInit, OnDestroy {
       .pipe(finalize(() => this.backingUp.set(false)))
       .subscribe({
         next: (backup) => {
-          if (backup.driveUploadStatus === 'uploaded') {
-            this.notice.set(`Copia de seguretat creada i pujada a Google Drive: ${backup.relativePath}`);
-          } else if (backup.driveUploadStatus === 'failed') {
-            this.notice.set(`Copia de seguretat creada: ${backup.relativePath}`);
-            this.error.set(`No s’ha pogut pujar a Google Drive: ${backup.driveError}`);
-          } else {
-            this.notice.set(`Copia de seguretat creada: ${backup.relativePath}`);
+          this.notice.set(`Còpia de seguretat creada: ${backup.fileName}`);
+          if (this.showBackupList) {
+            this.loadBackups();
           }
         },
         error: (response) => {
           this.error.set(
             typeof response.error === 'string'
               ? response.error
-              : 'No s ha pogut crear la copia de seguretat.',
+              : 'No s’ha pogut crear la còpia de seguretat.',
           );
         },
       });
   }
 
-  protected toggleDriveSettings(): void {
-    this.showDriveSettings = !this.showDriveSettings;
-    if (this.showDriveSettings) {
-      this.loadDriveStatus();
+  protected toggleBackupList(): void {
+    this.showBackupList = !this.showBackupList;
+    if (this.showBackupList) {
+      this.loadBackups();
     }
   }
 
-  protected loadDriveStatus(): void {
-    this.api.getDriveStatus().subscribe({
-      next: (status) => {
-        this.driveStatus.set(status);
-        this.driveSettingsForm = {
-          clientId: status.clientId ?? '',
-          clientSecret: '',
-          autoUpload: status.autoUpload,
-        };
-      },
-      error: () => this.error.set('No s’ha pogut carregar la configuració de Google Drive.'),
-    });
+  protected loadBackups(): void {
+    this.loadingBackups.set(true);
+    this.api.getBackups()
+      .pipe(finalize(() => this.loadingBackups.set(false)))
+      .subscribe({
+        next: (backups) => this.backups.set(backups),
+        error: () => this.error.set('No s’han pogut carregar les còpies de seguretat.'),
+      });
   }
 
-  protected saveDriveSettings(): void {
-    if (!this.driveSettingsForm.clientId.trim()) {
-      this.error.set('Indica el Client ID de Google.');
-      return;
-    }
-
-    this.savingDriveSettings.set(true);
+  protected downloadBackup(fileName: string): void {
+    this.downloadingBackupFileName.set(fileName);
     this.error.set('');
-    this.notice.set('');
-    this.api
-      .saveDriveSettings({
-        clientId: this.driveSettingsForm.clientId.trim(),
-        clientSecret: this.driveSettingsForm.clientSecret.trim() || undefined,
-        autoUpload: this.driveSettingsForm.autoUpload,
-      })
-      .pipe(finalize(() => this.savingDriveSettings.set(false)))
+    this.api.downloadBackup(fileName)
+      .pipe(finalize(() => this.downloadingBackupFileName.set(null)))
       .subscribe({
-        next: () => {
-          this.notice.set('Configuració de Google Drive desada.');
-          this.loadDriveStatus();
+        next: (blob) => {
+          const url = window.URL.createObjectURL(blob);
+          const link = document.createElement('a');
+          link.href = url;
+          link.download = fileName;
+          link.click();
+          window.URL.revokeObjectURL(url);
         },
-        error: (response) => {
-          this.error.set(
-            typeof response.error === 'string'
-              ? response.error
-              : 'No s’ha pogut desar la configuració de Google Drive.',
-          );
-        },
+        error: () => this.error.set('No s’ha pogut descarregar la còpia de seguretat.'),
       });
   }
 
-  protected connectDrive(): void {
-    const popup = window.open('/api/drive/connect', '_blank', 'width=520,height=680');
-    if (!popup) {
-      return;
+  protected formatBackupSize(sizeBytes: number): string {
+    if (sizeBytes < 1024 * 1024) {
+      return `${Math.max(1, Math.round(sizeBytes / 1024))} KB`;
     }
-
-    const checkClosed = setInterval(() => {
-      if (popup.closed) {
-        clearInterval(checkClosed);
-        this.loadDriveStatus();
-      }
-    }, 500);
-  }
-
-  protected disconnectDrive(): void {
-    this.disconnectingDrive.set(true);
-    this.api.disconnectDrive()
-      .pipe(finalize(() => this.disconnectingDrive.set(false)))
-      .subscribe({
-        next: () => {
-          this.notice.set('S’ha desconnectat Google Drive.');
-          this.loadDriveStatus();
-        },
-        error: () => this.error.set('No s’ha pogut desconnectar Google Drive.'),
-      });
+    return `${(sizeBytes / (1024 * 1024)).toFixed(1)} MB`;
   }
 
   protected get selectedBudget(): Budget | undefined {

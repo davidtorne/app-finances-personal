@@ -15,7 +15,6 @@ public sealed class FinanceDbContext(DbContextOptions<FinanceDbContext> options)
     public DbSet<BudgetItemTag> BudgetItemTags => Set<BudgetItemTag>();
     public DbSet<FixedExpense> FixedExpenses => Set<FixedExpense>();
     public DbSet<FixedExpenseTag> FixedExpenseTags => Set<FixedExpenseTag>();
-    public DbSet<DriveSettings> DriveSettings => Set<DriveSettings>();
     public DbSet<MonthlyFixedExpense> MonthlyFixedExpenses => Set<MonthlyFixedExpense>();
     public DbSet<SavingsAccount> SavingsAccounts => Set<SavingsAccount>();
     public DbSet<SavingsMovement> SavingsMovements => Set<SavingsMovement>();
@@ -107,15 +106,6 @@ public sealed class FinanceDbContext(DbContextOptions<FinanceDbContext> options)
                 .WithMany(item => item.FixedExpenseTags)
                 .HasForeignKey(item => item.TagId)
                 .OnDelete(DeleteBehavior.Restrict);
-        });
-
-        modelBuilder.Entity<DriveSettings>(entity =>
-        {
-            entity.Property(item => item.ClientId).HasMaxLength(240);
-            entity.Property(item => item.ClientSecret).HasMaxLength(240);
-            entity.Property(item => item.RefreshToken).HasMaxLength(1024);
-            entity.Property(item => item.ConnectedAccountEmail).HasMaxLength(320);
-            entity.Property(item => item.FolderId).HasMaxLength(120);
         });
 
         modelBuilder.Entity<MonthlyFixedExpense>(entity =>
